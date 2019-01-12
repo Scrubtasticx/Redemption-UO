@@ -1,0 +1,15 @@
+<!--[PayPal Button Code]-->
+<form action="https://<? echo PAYPAL_SERVER; ?>/cgi-bin/webscr" method="post">
+	<input type="hidden" name="cmd" value="_xclick" />
+	<input type="hidden" name="business" value="paypaluser@domain.com" />
+	<input type="hidden" name="notify_url" value="http://www.domain.com/IPN.php" />
+	<input type="hidden" name="return" value="http://www.domain.com" />
+	<input type="hidden" name="tax" value="0.00" />
+	<input type="hidden" name="currency_code" value="USD" />
+	<input type="hidden" name="item_name" value="Gold Coins" />
+	<input type="hidden" name="item_number" value="Gold" />
+	<input type="hidden" name="amount" value="1.00" />
+	<input type="text" name="quantity" value="100" />
+	<input type="text" name="custom" value="Account Name" />
+	<input type="image" name="submit" src="button.gif" alt="PayPal Donate" style="border: 0;" />
+</form>
