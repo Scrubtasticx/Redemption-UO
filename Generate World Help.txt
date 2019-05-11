@@ -1,0 +1,17 @@
+[Decorate
+[DecorateMag
+[Doorgen
+[GenLeverPuzzle
+[GenStealArties
+[MoonGen
+[SecretLocGen
+[SHTelGen
+[SignGen
+[TelGen
+[UOAMVendors
+[VendorGen
+[GenGauntlet
+[GenKhaldun
+[SecretLocGen
+[GenerateFactions
+[XmlLoad Spawns
