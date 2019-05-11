@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <StaffRunebook Version="110">
-	<RuneAccount Username="scrubtasticx">
+	<RuneAccount Username="admin">
 		<Runebook Name="Felucca">
 			<Runebook Name="Factions">
 				<Runebook Name="Towns">
@@ -130,6 +130,12 @@
 				</Runebook>
 			</Runebook>
 			<Runebook Name="Internal">
+				<Runebook Name="Staff Locations">
+					<Rune Name="Offices" TargetMap="Felucca" X="5372" Y="1143" Z="5" />
+					<Rune Name="Wedding Chapel" TargetMap="Felucca" X="5417" Y="1163" Z="0" />
+					<Rune Name="Christmas Area" TargetMap="Felucca" X="5459" Y="1116" Z="0" />
+					<Rune Name="Poker" TargetMap="Felucca" X="2247" Y="1318" Z="1" />
+				</Runebook>
 				<Runebook Name="Jail Cells">
 					<Rune Name="Cell 1" TargetMap="Felucca" X="5276" Y="1164" Z="0" />
 					<Rune Name="Cell 2" TargetMap="Felucca" X="5286" Y="1164" Z="0" />

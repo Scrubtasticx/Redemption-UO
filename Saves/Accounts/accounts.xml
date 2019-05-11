@@ -1,44 +1,43 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<accounts count="5">
+<accounts count="3">
 	<account>
-		<username>scrubtasticx</username>
-		<newCryptPassword>E1-B4-F7-4E-74-34-BF-75-11-FB-4E-81-9E-5B-3C-7E-C3-C8-33-2C</newCryptPassword>
+		<username>admin</username>
+		<newCryptPassword>A3-90-FC-C8-BE-A3-C9-1D-AB-27-49-67-56-D3-A0-E0-5C-D5-85-65</newCryptPassword>
 		<accessLevel>Owner</accessLevel>
-		<flags>2</flags>
-		<created>2014-02-02T17:51:04.82495Z</created>
-		<lastLogin>2018-10-21T17:20:34.8834749Z</lastLogin>
-		<totalGameTime>P6DT16H56M30.5405421S</totalGameTime>
+		<created>2019-05-11T19:44:44.9709915Z</created>
+		<lastLogin>2019-05-11T22:37:13.0916326Z</lastLogin>
+		<totalGameTime>PT2H8M19.0020375S</totalGameTime>
 		<chars>
-			<char index="0">338</char>
+			<char index="0">1</char>
 		</chars>
 		<tags>
 			<tag name="AlreadyGotTheirGold">True</tag>
-			<tag name="motd">false</tag>
 		</tags>
-		<addressList count="9">
+		<addressList count="1">
 			<ip>127.0.0.1</ip>
-			<ip>192.168.0.2</ip>
-			<ip>65.8.96.157</ip>
-			<ip>184.33.52.123</ip>
-			<ip>184.33.58.242</ip>
-			<ip>184.33.56.237</ip>
-			<ip>184.33.52.182</ip>
-			<ip>65.8.96.164</ip>
-			<ip>184.33.53.243</ip>
 		</addressList>
+		<totalCurrency>0.0001</totalCurrency>
+	</account>
+	<account>
+		<username>rage</username>
+		<newCryptPassword>80-C7-6B-EA-73-F9-BF-48-3C-6A-40-C9-2C-44-8B-EB-9A-56-CB-7F</newCryptPassword>
+		<created>2019-05-11T21:27:44.7166661Z</created>
+		<lastLogin>2019-05-11T21:27:44.7166661Z</lastLogin>
+		<totalGameTime>PT0S</totalGameTime>
+		<chars />
+		<addressList count="1">
+			<ip>127.0.0.1</ip>
+		</addressList>
+		<totalCurrency>0</totalCurrency>
 	</account>
 	<account>
 		<username>zycron</username>
-		<newCryptPassword>0A-C3-1D-A3-BE-1A-75-83-7C-32-34-65-76-8A-6C-FD-A5-56-2D-7D</newCryptPassword>
-		<created>2018-10-15T16:24:28.7602463Z</created>
-		<lastLogin>2018-10-21T18:02:55.8036909Z</lastLogin>
-		<totalGameTime>PT3H7M32.0293976S</totalGameTime>
+		<newCryptPassword>6D-3A-A4-7A-FF-CC-F3-3D-F0-A0-BB-C4-03-72-55-4C-43-97-05-85</newCryptPassword>
+		<created>2019-05-11T21:36:32.2143924Z</created>
+		<lastLogin>2019-05-11T22:36:48.0128504Z</lastLogin>
+		<totalGameTime>PT59M56.0316468S</totalGameTime>
 		<chars>
-			<char index="0">359</char>
-			<char index="1">339</char>
-			<char index="2">376</char>
-			<char index="3">382</char>
-			<char index="4">440</char>
+			<char index="0">1552</char>
 		</chars>
 		<tags>
 			<tag name="AlreadyGotTheirGold">True</tag>
@@ -46,41 +45,6 @@
 		<addressList count="1">
 			<ip>127.0.0.1</ip>
 		</addressList>
-	</account>
-	<account>
-		<username>warlorn</username>
-		<newCryptPassword>75-C2-39-D1-31-A4-C1-3F-70-88-45-19-4F-F9-67-72-71-D0-45-16</newCryptPassword>
-		<created>2018-10-15T16:24:43.7282012Z</created>
-		<lastLogin>2018-10-19T17:47:29.2949637Z</lastLogin>
-		<totalGameTime>PT47M36.7598339S</totalGameTime>
-		<chars>
-			<char index="0">757</char>
-			<char index="1">1337</char>
-			<char index="2">1420</char>
-			<char index="3">600</char>
-			<char index="4">626</char>
-		</chars>
-		<tags>
-			<tag name="AlreadyGotTheirGold">True</tag>
-		</tags>
-		<addressList count="1">
-			<ip>127.0.0.1</ip>
-		</addressList>
-	</account>
-	<account>
-		<username>zyccraft</username>
-		<newCryptPassword>1A-E4-E3-AD-D5-7F-D5-78-69-E0-A4-30-23-AA-0A-D5-D9-E9-1D-EA</newCryptPassword>
-		<created>2018-10-15T16:24:54.6538711Z</created>
-		<lastLogin>2018-10-15T16:24:54.6538711Z</lastLogin>
-		<totalGameTime>PT0S</totalGameTime>
-		<chars />
-	</account>
-	<account>
-		<username>warcraft</username>
-		<newCryptPassword>0E-C0-9A-AF-9E-07-7B-67-CB-26-3C-CE-7A-6B-68-A5-D2-C8-C6-C0</newCryptPassword>
-		<created>2018-10-15T16:25:04.5494869Z</created>
-		<lastLogin>2018-10-15T16:25:04.5494869Z</lastLogin>
-		<totalGameTime>PT0S</totalGameTime>
-		<chars />
+		<totalCurrency>9.9893999999999989E-05</totalCurrency>
 	</account>
 </accounts>
