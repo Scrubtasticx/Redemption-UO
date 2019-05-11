@@ -1,19 +1,33 @@
-FavUO Git Repository
+runuo
+=====
 
-FavUO is a Ultima Online editor based off of RunUO 2.6 and is based to be the closest thing to Hybrid and Zenvera servers. Max server client is 7.0.51.0
+[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/4tjo91e4qotjtsgq?svg=true)](https://ci.appveyor.com/project/ms/runuo) [![Travis Build Status](https://travis-ci.org/runuo/runuo.svg)](https://travis-ci.org/runuo/runuo)
 
-FavUO's files include a massive amount of custom packages including poker, full pvp system and player info tabs, and more!
+[![Join the chat at https://gitter.im/runuo/runuo](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/runuo/runuo?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+RunUO Git Repository
+
+*** 
+RunUO is no longer officially supported by a core team.
+
+If you wish to find support in a wider UO development commuity, visit [ServUO - Ultima Online Emulation](http://www.servuo.com)
+***
 
 Typical Windows Build
 
-Compile with Visual Studio Community
+PS C:\runuo> C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc /optimize /unsafe /t:exe /out:RunUO.exe /win32icon:Server\runuo.ico /d:NEWTIMERS /d:NEWPARENT /recurse:Server\\*.cs
+
 
 Typical Linux Build (MONO)
 
-~/favuo$ dmcs -optimize+ -unsafe -t:exe -out:FavUO.exe -win32icon:Server/favuo.ico -nowarn:219,414 -d:MONO -recurse:Server/*.cs
+~/runuo$ mcs -optimize+ -unsafe -t:exe -out:RunUO.exe -win32icon:Server/runuo.ico -nowarn:219,414 -d:NEWTIMERS -d:NEWPARENT -d:MONO -reference:System.Drawing -recurse:Server/*.cs
 
-FavUO supports Intel's hardware random number generator (Secure Key, Bull Mountain, rdrand, etc). If rdrand32.dll/rdrand64.dll are present in the base directory and the hardware supports that functionality, it will be used automatically. You can find those libraries here: https://github.com/msturgill/rdrand/releases/latest
 
-Latest Razor builds can be found at https://github.com/FavUO/Razor
+zlib is required for certain functionality. Windows zlib builds are packaged with releases and can also be obtained separately here: https://github.com/msturgill/zlib/releases/latest
 
-IRC: chat.freenode.net #favuo.
+RunUO supports Intel's hardware random number generator (Secure Key, Bull Mountain, rdrand, etc). If rdrand32.dll/rdrand64.dll are present in the base directory and the hardware supports that functionality, it will be used automatically. You can find those libraries here: https://github.com/msturgill/rdrand/releases/latest
+
+Latest Razor builds can be found at https://github.com/msturgill/razor/releases/latest
+
+Latest UOSteam builds (previously AssistUO) can be found at http://uosteam.com
+

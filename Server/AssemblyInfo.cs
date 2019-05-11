@@ -27,12 +27,12 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 //
-[assembly: AssemblyTitle("FavUO Server")]	//Having just RunUO there is reundant, ie, RunUO.exe with the word 'RunUO' under it
-[assembly: AssemblyDescription("Ultima Online Emulator")]
+[assembly: AssemblyTitle("RunUO Server Core")]	//Having just RunUO there is reundant, ie, RunUO.exe with the word 'RunUO' under it
+[assembly: AssemblyDescription("UO Server Software")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("FavUO")]
-[assembly: AssemblyProduct("FavUO")]
-[assembly: AssemblyCopyright("Copyright ©  2018")]
+[assembly: AssemblyCompany("RunUO")]
+[assembly: AssemblyProduct("RunUO")]
+[assembly: AssemblyCopyright("Copyright ©  2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -47,7 +47,7 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Revision and Build Numbers 
 // by using the '*' as shown below:
 
-[assembly: AssemblyVersion("3.5.*")]
+[assembly: AssemblyVersion("2.7.0.*")]
 
 //
 // In order to sign your assembly you must specify a key to use. Refer to the 

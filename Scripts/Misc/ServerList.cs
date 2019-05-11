@@ -39,7 +39,7 @@ namespace Server.Misc
 		 */
 
 		public static readonly string Address = null;
-		public static readonly string ServerName = "Unmixed";
+		public static readonly string ServerName = "RunUO TC";
 
 		public static readonly bool AutoDetect = true;
 
@@ -86,28 +86,24 @@ namespace Server.Misc
 
 		private static void AutoDetection()
 		{
-			if (HasPublicIPAddress())
+			if (!HasPublicIPAddress())
 			{
-				return;
-			}
-
-			Utility.PushColor(ConsoleColor.Yellow);
-			Console.Write("ServerList: Auto-detecting public IP address...");
-			Utility.PopColor();
-
-			m_PublicAddress = FindPublicAddress();
-
-			if (m_PublicAddress != null)
-			{
-				Utility.PushColor(ConsoleColor.Green);
-				Console.WriteLine("done ({0})", m_PublicAddress);
+				Utility.PushColor(ConsoleColor.Yellow);
+				Console.Write("ServerList: Auto-detecting public IP address...");
 				Utility.PopColor();
-			}
-			else
-			{
-				Utility.PushColor(ConsoleColor.Red);
-				Console.WriteLine("failed");
-				Utility.PopColor();
+				m_PublicAddress = FindPublicAddress();
+
+				if (m_PublicAddress != null)
+				{
+					Utility.PushColor(ConsoleColor.Green);
+					Console.WriteLine("done ({0})", m_PublicAddress.ToString());
+					Utility.PopColor();
+				}
+
+				else
+					Utility.PushColor(ConsoleColor.Red);
+					Console.WriteLine( "failed" );
+					Utility.PopColor();
 			}
 		}
 
@@ -187,7 +183,7 @@ namespace Server.Misc
 		private static IPAddress FindPublicAddress()
 		{
 			try {
-				WebRequest req = HttpWebRequest.Create( "http://uo.cx/ip.php" );
+				WebRequest req = HttpWebRequest.Create( "https://api.ipify.org" );
 
 				req.Timeout = 15000;
 
