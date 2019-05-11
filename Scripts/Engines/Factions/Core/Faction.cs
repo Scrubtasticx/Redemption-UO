@@ -483,8 +483,6 @@ namespace Server.Factions
 				pm.SendLocalizedMessage( 1005059 ); // You cannot join a faction because you already declared your allegiance with another character
 			else if ( IsFactionBanned( mob ) )
 				pm.SendLocalizedMessage( 1005052 ); // You are currently banned from the faction system
-			else if ( pm.SkillsTotal < 6000 )
-                pm.SendMessage( "You must have atleast 600 skill points to join factions" ) ;
 			else if ( pm.Guild != null )
 			{
 				Guild guild = pm.Guild as Guild;

@@ -6,7 +6,6 @@ using Server;
 using Server.Commands;
 using Server.Mobiles;
 using Server.Spells;
-using Server.Factions;
 
 namespace Server.Regions
 {
@@ -209,11 +208,11 @@ namespace Server.Regions
 		{
 			if ( IsDisabled() )
 				return;
-							
+
 			if ( !AllowReds && m.Kills >= 5 )
 				CheckGuardCandidate( m );
 		}
-			
+
 		public override void OnExit( Mobile m )
 		{
 			if ( IsDisabled() )
@@ -328,8 +327,6 @@ namespace Server.Regions
 
 			foreach ( Mobile m in eable )
 			{
-				Factions.PlayerState mobileState = Factions.PlayerState.Find(m);
-				
 				if ( IsGuardCandidate( m ) && ( ( mobileState == null && m.Kills >= 5 && m.Region.IsPartOf( this ) ) || m_GuardCandidates.ContainsKey( m ) ) )
 				{
 					GuardTimer timer = null;
@@ -352,8 +349,6 @@ namespace Server.Regions
 
 		public bool IsGuardCandidate( Mobile m )
 		{
-			Factions.PlayerState mobileState = Factions.PlayerState.Find(m);
-			
 			if ( m is BaseGuard || !m.Alive || m.AccessLevel > AccessLevel.Player || m.Blessed || ( m is BaseCreature && ((BaseCreature)m).IsInvulnerable ) || IsDisabled() )
 				return false;
 
