@@ -381,22 +381,6 @@ Zycron */
 			}
 			else if ( e.HasKeyword( 0x28 ) ) // trash barrel
 			{
-			
-				TrashBarrel t = m_House.TrashBarrel;
-	 			if (t != null && !t.Deleted)
-	 		{
-	 			if (m_House.HasSecureAccess(from, t.Level))
-	 		{
-	 			m_House.AddTrashBarrel(from);
-	 		}
-	 		else
-	 		{
-	 			from.SendMessage("You cannot access this house's trash barrel.");
-	 		}
-
-	 			return;
-	 		}
-	
 				if ( isCoOwner )
 				{
 					m_House.AddTrashBarrel( from );

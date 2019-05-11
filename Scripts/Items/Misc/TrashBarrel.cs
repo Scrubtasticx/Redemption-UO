@@ -2,16 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Server.Multis;
-using Server.Gumps;
-using Server.ContextMenus;
 
 namespace Server.Items
 {
-	public class TrashBarrel : Container, IChopable, ISecurable
+	public class TrashBarrel : Container, IChopable
 	{
-	
-		private SecureLevel m_Level;
-
 		public override int LabelNumber{ get{ return 1041064; } } // a trash barrel
 
 		public override int DefaultMaxWeight{ get{ return 0; } } // A value of 0 signals unlimited weight
@@ -20,20 +15,12 @@ namespace Server.Items
 		{
 			get{ return false; }
 		}
-		
-		[CommandProperty(AccessLevel.GameMaster)]
-		public SecureLevel Level
-		{
-			get { return m_Level; }
-			set { m_Level = value; }
-		}
 
 		[Constructable]
 		public TrashBarrel() : base( 0xE77 )
 		{
 			Hue = 0x3B2;
 			Movable = false;
-			m_Level = SecureLevel.CoOwners;
 		}
 
 		public TrashBarrel( Serial serial ) : base( serial )
@@ -44,9 +31,7 @@ namespace Server.Items
 		{
 			base.Serialize( writer );
 
-			writer.Write( (int) 1 ); // version
-			
-			writer.Write( (int) m_Level);
+			writer.Write( (int) 0 ); // version
 		}
 
 		public override void Deserialize( GenericReader reader )
@@ -54,24 +39,12 @@ namespace Server.Items
 			base.Deserialize( reader );
 
 			int version = reader.ReadInt();
-			
-				 if (version >= 1)
-					m_Level = (SecureLevel)reader.ReadInt();
-				else
-					m_Level = SecureLevel.CoOwners;
 
-				if ( Items.Count > 0 )
-				{
-					m_Timer = new EmptyTimer( this );
-                    m_Timer.Start();
- 
-                }
-		}
-
-    	 public override void GetContextMenuEntries(Mobile from, List<ContextMenuEntry> list)
-		{
-			base.GetContextMenuEntries(from, list);
-			SetSecureLevelEntry.AddTo(from, this, list);
+			if ( Items.Count > 0 )
+			{
+				m_Timer = new EmptyTimer( this );
+				m_Timer.Start();
+			}
 		}
 
 		public override bool OnDragDrop( Mobile from, Item dropped )
@@ -126,7 +99,7 @@ namespace Server.Items
 		{
 			BaseHouse house = BaseHouse.FindHouseAt( from );
 
-			if ( house != null && house.HasSecureAccess(from, m_Level) )
+			if ( house != null && house.IsCoOwner( from ) )
 			{
 				Effects.PlaySound( Location, Map, 0x3B3 );
 				from.SendLocalizedMessage( 500461 ); // You destroy the item.
