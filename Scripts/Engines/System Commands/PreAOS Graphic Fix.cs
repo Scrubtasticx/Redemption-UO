@@ -7,7 +7,7 @@ namespace Server.Misc
     public class ExpansionArt
     {
           public static void Initialize() {
-          Server.Network.SupportedFeatures.Value = FeatureFlags.ExpansionHS;
+          Server.Network.SupportedFeatures.Value = FeatureFlags.ExpansionTOL;
 
         }
     }
