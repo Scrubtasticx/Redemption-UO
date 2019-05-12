@@ -13,7 +13,7 @@ namespace Server.Engines.MyRunUO
         public const string DatabaseServer = "localhost";
         public const string DatabaseName = "ultima";
         public const string DatabaseUserID = "root";
-        public const string DatabasePassword = "Kakashizoro81";
+        public const string DatabasePassword = "";
         // Should the database use transactions? This is recommended
         public static bool UseTransactions = true;
         // Use optimized table loading techniques? (LOAD DATA INFILE)
@@ -27,9 +27,9 @@ namespace Server.Engines.MyRunUO
         // Any character with an AccessLevel equal to or higher than this will not be displayed
         public static AccessLevel HiddenAccessLevel = AccessLevel.Counselor;
         // Export character database every 30 minutes
-        public static TimeSpan CharacterUpdateInterval = TimeSpan.FromMinutes(1.0);
+        public static TimeSpan CharacterUpdateInterval = TimeSpan.FromMinutes(30.0);
         // Export online list database every 5 minutes
-        public static TimeSpan StatusUpdateInterval = TimeSpan.FromMinutes(1.0);
+        public static TimeSpan StatusUpdateInterval = TimeSpan.FromMinutes(5.0);
         public static string CompileConnectionString()
         {
             string connectionString = String.Format("DRIVER={0};SERVER={1};DATABASE={2};UID={3};PASSWORD={4};",
