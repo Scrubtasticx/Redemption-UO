@@ -14,4 +14,4 @@
 [GenKhaldun
 [SecretLocGen
 [GenerateFactions
-[XmlLoad Spawns
+[XmlLoad Spawns.xml
