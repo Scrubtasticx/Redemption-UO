@@ -31,7 +31,7 @@ namespace Server.Misc
 			//PackItem( new Gold( 1000 ) ); // Starting gold can be customized here
 			PackItem( new Dagger() );
 			PackItem( new Candle() );
-			PackItem( new Spellbook( UInt64.MaxValue ) );
+			//PackItem( new Spellbook( UInt64.MaxValue ) );
 			
 			Account account = (Account)m.Account;
 				if(account.GetTag("AlreadyGotTheirGold") == null)

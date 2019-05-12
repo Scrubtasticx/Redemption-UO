@@ -10,7 +10,7 @@ namespace Server.Misc
 	{
 		private static class Settings
 		{
-			public const bool Enabled = false;
+			public const bool Enabled = true;
 			public const bool KickOnFailure = true; // It will also kick clients running without assistants
 
 			public static readonly TimeSpan HandshakeTimeout = TimeSpan.FromSeconds(30.0);
@@ -26,6 +26,7 @@ namespace Server.Misc
 			public static void Configure()
 			{
 				//DisallowFeature( Features.FilterWeather );
+				DisallowFeature( Features.AutolootAgent );
 			}
 
 			[Flags]
