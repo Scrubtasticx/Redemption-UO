@@ -3475,7 +3475,7 @@ namespace Server.Items
 			if ( resourceType == null )
 				resourceType = craftItem.Resources.GetAt( 0 ).ItemType;
 
-			if ( !Core.AOS )
+			if ( Core.AOS )
 			{
 				Resource = CraftResources.GetFromType( resourceType );
 
