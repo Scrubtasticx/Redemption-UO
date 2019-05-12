@@ -1,202 +1,258 @@
 using System;
-using System.Threading;
 using System.Collections;
-using System.Data;
 using System.Data.Odbc;
+using System.Threading;
 
 namespace Server.Engines.MyRunUO
 {
-	public class DatabaseCommandQueue
-	{
-		private Queue m_Queue;
-		private ManualResetEvent m_Sync;
-		private Thread m_Thread;
+    public class DatabaseCommandQueue
+    {
+        private readonly Queue m_Queue;
+        private readonly ManualResetEvent m_Sync;
+        private readonly Thread m_Thread;
+        private readonly string m_CompletionString;
+        private readonly string m_ConnectionString;
+        private bool m_HasCompleted;
+        public DatabaseCommandQueue(string completionString, string threadName)
+            : this(Config.CompileConnectionString(), completionString, threadName)
+        {
+        }
 
-		private bool m_HasCompleted;
+        public DatabaseCommandQueue(string connectionString, string completionString, string threadName)
+        {
+            this.m_CompletionString = completionString;
+            this.m_ConnectionString = connectionString;
 
-		private string m_CompletionString;
-		private string m_ConnectionString;
+            this.m_Queue = Queue.Synchronized(new Queue());
 
-		public bool HasCompleted
-		{
-			get{ return m_HasCompleted; }
-		}
+            this.m_Queue.Enqueue(null); // signal connect
 
-		public void Enqueue( object obj )
-		{
-			lock ( m_Queue.SyncRoot )
-			{
-				m_Queue.Enqueue( obj );
-				try{ m_Sync.Set(); }
-				catch{}
-			}
-		}
+            /*m_Queue.Enqueue( "DELETE FROM myrunuo_characters" );
+            m_Queue.Enqueue( "DELETE FROM myrunuo_characters_layers" );
+            m_Queue.Enqueue( "DELETE FROM myrunuo_characters_skills" );
+            m_Queue.Enqueue( "DELETE FROM myrunuo_guilds" );
+            m_Queue.Enqueue( "DELETE FROM myrunuo_guilds_wars" );*/
 
-		public DatabaseCommandQueue( string completionString, string threadName ) : this( Config.CompileConnectionString(), completionString, threadName )
-		{
-		}
+            this.m_Sync = new ManualResetEvent(true);
 
-		public DatabaseCommandQueue( string connectionString, string completionString, string threadName )
-		{
-			m_CompletionString = completionString;
-			m_ConnectionString = connectionString;
+            this.m_Thread = new Thread(new ThreadStart(Thread_Start));
+            this.m_Thread.Name = threadName;//"MyRunUO Database Command Queue";
+            this.m_Thread.Priority = Config.DatabaseThreadPriority;
+            this.m_Thread.Start();
+        }
 
-			m_Queue = Queue.Synchronized( new Queue() );
+        public bool HasCompleted
+        {
+            get
+            {
+                return this.m_HasCompleted;
+            }
+        }
+        public void Enqueue(object obj)
+        {
+            lock (this.m_Queue.SyncRoot)
+            {
+                this.m_Queue.Enqueue(obj);
+                try
+                {
+                    this.m_Sync.Set();
+                }
+                catch
+                {
+                }
+            }
+        }
 
-			m_Queue.Enqueue( null ); // signal connect
+        private void Thread_Start()
+        {
+            bool connected = false;
 
-			/*m_Queue.Enqueue( "DELETE FROM myrunuo_characters" );
-			m_Queue.Enqueue( "DELETE FROM myrunuo_characters_layers" );
-			m_Queue.Enqueue( "DELETE FROM myrunuo_characters_skills" );
-			m_Queue.Enqueue( "DELETE FROM myrunuo_guilds" );
-			m_Queue.Enqueue( "DELETE FROM myrunuo_guilds_wars" );*/
+            OdbcConnection connection = null;
+            OdbcCommand command = null;
+            OdbcTransaction transact = null;
 
-			m_Sync = new ManualResetEvent( true );
+            DateTime start = DateTime.UtcNow;
 
-			m_Thread = new Thread( new ThreadStart( Thread_Start ) );
-			m_Thread.Name = threadName;//"MyRunUO Database Command Queue";
-			m_Thread.Priority = Config.DatabaseThreadPriority;
-			m_Thread.Start();
-		}
+            bool shouldWriteException = true;
 
-		private void Thread_Start()
-		{
-			bool connected = false;
+            while (true)
+            {
+                this.m_Sync.WaitOne();
 
-			OdbcConnection connection = null;
-			OdbcCommand command = null;
-			OdbcTransaction transact = null;
+                while (this.m_Queue.Count > 0)
+                {
+                    try
+                    {
+                        object obj = this.m_Queue.Dequeue();
 
-			DateTime start = DateTime.UtcNow;
+                        if (obj == null)
+                        {
+                            if (connected)
+                            {
+                                if (transact != null)
+                                {
+                                    try
+                                    {
+                                        transact.Commit();
+                                    }
+                                    catch (Exception commitException)
+                                    {
+                                        Console.WriteLine("MyRunUO: Exception caught when committing transaction");
+                                        Console.WriteLine(commitException);
 
-			bool shouldWriteException = true;
+                                        try
+                                        {
+                                            transact.Rollback();
+                                            Console.WriteLine("MyRunUO: Transaction has been rolled back");
+                                        }
+                                        catch (Exception rollbackException)
+                                        {
+                                            Console.WriteLine("MyRunUO: Exception caught when rolling back transaction");
+                                            Console.WriteLine(rollbackException);
+                                        }
+                                    }
+                                }
 
-			while ( true )
-			{
-				m_Sync.WaitOne();
+                                try
+                                {
+                                    connection.Close();
+                                }
+                                catch
+                                {
+                                }
 
-				while ( m_Queue.Count > 0 )
-				{
-					try
-					{
-						object obj = m_Queue.Dequeue();
+                                try
+                                {
+                                    connection.Dispose();
+                                }
+                                catch
+                                {
+                                }
 
-						if ( obj == null )
-						{
-							if ( connected )
-							{
-								if ( transact != null )
-								{
-									try{ transact.Commit(); }
-									catch ( Exception commitException )
-									{
-										Console.WriteLine( "MyRunUO: Exception caught when committing transaction" );
-										Console.WriteLine( commitException );
+                                try
+                                {
+                                    command.Dispose();
+                                }
+                                catch
+                                {
+                                }
 
-										try
-										{
-											transact.Rollback();
-											Console.WriteLine( "MyRunUO: Transaction has been rolled back" );
-										}
-										catch ( Exception rollbackException )
-										{
-											Console.WriteLine( "MyRunUO: Exception caught when rolling back transaction" );
-											Console.WriteLine( rollbackException );
-										}
-									}
-								}
+                                try
+                                {
+                                    this.m_Sync.Close();
+                                }
+                                catch
+                                {
+                                }
 
-								try{ connection.Close(); }
-								catch{}
+                                Console.WriteLine(this.m_CompletionString, (DateTime.UtcNow - start).TotalSeconds);
+                                this.m_HasCompleted = true;
 
-								try{ connection.Dispose(); }
-								catch{}
+                                return;
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    connected = true;
+                                    connection = new OdbcConnection(this.m_ConnectionString);
+                                    connection.Open();
+                                    command = connection.CreateCommand();
 
-								try{ command.Dispose(); }
-								catch{}
+                                    if (Config.UseTransactions)
+                                    {
+                                        transact = connection.BeginTransaction();
+                                        command.Transaction = transact;
+                                    }
+                                }
+                                catch (Exception e)
+                                {
+                                    try
+                                    {
+                                        if (transact != null)
+                                            transact.Rollback();
+                                    }
+                                    catch
+                                    {
+                                    }
 
-								try{ m_Sync.Close(); }
-								catch{}
+                                    try
+                                    {
+                                        if (connection != null)
+                                            connection.Close();
+                                    }
+                                    catch
+                                    {
+                                    }
 
-								Console.WriteLine( m_CompletionString, (DateTime.UtcNow - start).TotalSeconds );
-								m_HasCompleted = true;
+                                    try
+                                    {
+                                        if (connection != null)
+                                            connection.Dispose();
+                                    }
+                                    catch
+                                    {
+                                    }
 
-								return;
-							}
-							else
-							{
-								try
-								{
-									connected = true;
-									connection = new OdbcConnection( m_ConnectionString );
-									connection.Open();
-									command = connection.CreateCommand();
+                                    try
+                                    {
+                                        if (command != null)
+                                            command.Dispose();
+                                    }
+                                    catch
+                                    {
+                                    }
 
-									if ( Config.UseTransactions )
-									{
-										transact = connection.BeginTransaction();
-										command.Transaction = transact;
-									}
-								}
-								catch ( Exception e )
-								{
-									try{ if ( transact != null ) transact.Rollback(); }
-									catch{}
+                                    try
+                                    {
+                                        this.m_Sync.Close();
+                                    }
+                                    catch
+                                    {
+                                    }
 
-									try{ if ( connection != null ) connection.Close(); }
-									catch{}
+                                    Console.WriteLine("MyRunUO: Unable to connect to the database");
+                                    Console.WriteLine(e);
+                                    this.m_HasCompleted = true;
+                                    return;
+                                }
+                            }
+                        }
+                        else if (obj is string)
+                        {
+                            command.CommandText = (string)obj;
+                            command.ExecuteNonQuery();
+                        }
+                        else
+                        {
+                            string[] parms = (string[])obj;
 
-									try{ if ( connection != null ) connection.Dispose(); }
-									catch{}
+                            command.CommandText = parms[0];
 
-									try{ if ( command != null ) command.Dispose(); }
-									catch{}
+                            if (command.ExecuteScalar() == null)
+                            {
+                                command.CommandText = parms[1];
+                                command.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        if (shouldWriteException)
+                        {
+                            Console.WriteLine("MyRunUO: Exception caught in database thread");
+                            Console.WriteLine(e);
+                            shouldWriteException = false;
+                        }
+                    }
+                }
 
-									try{ m_Sync.Close(); }
-									catch{}
-
-									Console.WriteLine( "MyRunUO: Unable to connect to the database" );
-									Console.WriteLine( e );
-									m_HasCompleted = true;
-									return;
-								}
-							}
-						}
-						else if ( obj is string )
-						{
-							command.CommandText = (string)obj;
-							command.ExecuteNonQuery();
-						}
-						else
-						{
-							string[] parms = (string[])obj;
-
-							command.CommandText = parms[0];
-
-							if ( command.ExecuteScalar() == null )
-							{
-								command.CommandText = parms[1];
-								command.ExecuteNonQuery();
-							}
-						}
-					}
-					catch ( Exception e )
-					{
-						if ( shouldWriteException )
-						{
-							Console.WriteLine( "MyRunUO: Exception caught in database thread" );
-							Console.WriteLine( e );
-							shouldWriteException = false;
-						}
-					}
-				}
-
-				lock ( m_Queue.SyncRoot )
-				{
-					if ( m_Queue.Count == 0 )
-						m_Sync.Reset();
-				}
-			}
-		}
-	}
+                lock (this.m_Queue.SyncRoot)
+                {
+                    if (this.m_Queue.Count == 0)
+                        this.m_Sync.Reset();
+                }
+            }
+        }
+    }
 }
