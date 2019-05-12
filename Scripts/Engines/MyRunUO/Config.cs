@@ -7,14 +7,14 @@ namespace Server.Engines.MyRunUO
 	public class Config
 	{
 		// Is MyRunUO enabled?
-		public static bool Enabled = false;
+		public static bool Enabled = true;
 
 		// Details required for database connection string
-		public const string DatabaseDriver		= "{MySQL ODBC 5.2w Driver}";
+		public const string DatabaseDriver		= "{MySQL ODBC 5.2 Unicode Driver}";
 		public const string DatabaseServer		= "localhost";
-		public const string DatabaseName		= "MyRunUO";
-		public const string DatabaseUserID		= "username";
-		public const string DatabasePassword	= "password";
+		public const string DatabaseName		= "ultima";
+		public const string DatabaseUserID		= "root";
+		public const string DatabasePassword	= "Kakashizoro81";
 
 		// Should the database use transactions? This is recommended
 		public static bool UseTransactions = true;
