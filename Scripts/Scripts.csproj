@@ -785,6 +785,7 @@
     <Compile Include="Engines\Staff Runebook\RuneGate.cs" />
     <Compile Include="Engines\Staff Runebook\Save.cs" />
     <Compile Include="Engines\Staff Runebook\Utilities.cs" />
+	<Compile Include="Engines\System Commands\Createworld.cs" />
     <Compile Include="Engines\System Commands\EasyUO.cs" />
     <Compile Include="Engines\System Commands\Emote.cs" />
     <Compile Include="Engines\System Commands\FillBOD.cs" />
