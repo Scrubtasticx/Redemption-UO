@@ -52,7 +52,7 @@ namespace Server.Gumps
 			AddBackground(449, 379, 455, 243, 9200);
 			
 	//Titles
-			AddLabel(625, 385, 52, @"CREATE WORLD");
+			AddLabel(625, 385, 0, @"CREATE WORLD");
 	//Options
 			AddButton(465, 584, 4005, 4006, 1, GumpButtonType.Reply, 0);
 			AddHtml( 500, 450, 350, 81, @"Will Generate world for you.", (bool)true, (bool)true);
