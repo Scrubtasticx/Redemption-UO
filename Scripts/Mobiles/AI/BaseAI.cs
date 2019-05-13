@@ -2523,11 +2523,11 @@ namespace Server.Mobiles
 					if (m_Mobile.Summoned && m_Mobile.SummonMaster != null)
 					{
 					
-/*Zycron 					
+/*RedemptionUO Start 					
 						// If this is a summon, it can't target its controller.
 						if (m == m_Mobile.SummonMaster)
 							continue;
-Zycron End */
+RedemptionUO End */
 						// It also must abide by harmful spell rules.
 						if (!Server.Spells.SpellHelper.ValidIndirectTarget(m_Mobile.SummonMaster, m))
 							continue;

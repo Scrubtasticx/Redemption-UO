@@ -68,12 +68,13 @@ namespace Server.Items
 
 		public override void Drink( Mobile from )
 		{
+//RedemptionUO Start			
             if(!from.CanBeginAction(typeof(BaseExplosionPotion))) //Checking the block 
             { 
                 from.SendMessage("You should wait before reusing this potion"); 
                 return; 
             } 
-           
+//RedemptionUO End           
 			if ( Core.AOS && (from.Paralyzed || from.Frozen || (from.Spell != null && from.Spell.IsCasting)) )
 			{
 				from.SendLocalizedMessage( 1062725 ); // You can not use a purple potion while paralyzed.
@@ -190,9 +191,10 @@ namespace Server.Items
 
 			protected override void OnTarget( Mobile from, object targeted )
 			{
+//RedemptionUO Start				
                 from.BeginAction(typeof(BaseExplosionPotion)); // setting block to an action 
                 Timer.DelayCall(TimeSpan.FromSeconds(3.0), new TimerStateCallback(EndAction), from); // In 3 seconds EndAction method will be called and this block will be removed
-
+//RedemptionUO End
 				if ( m_Potion.Deleted || m_Potion.Map == Map.Internal )
 					return;
 
@@ -211,10 +213,11 @@ namespace Server.Items
 				from.RevealingAction();
 
 				IEntity to;
-
+//RedemptionUO Start
 				if ( p is Mobile )
 					to = (Mobile)p;
 				else
+//RedemptionUO End				
 				to = new Entity( Serial.Zero, new Point3D( p ), map );
 
 				if( p is Mobile )
@@ -315,13 +318,15 @@ namespace Server.Items
 
 					pot.Explode( from, false, pot.GetWorldLocation(), pot.Map );
 				}
+//RedemptionUO Start            
             }
         }
               public static void EndAction( object state ) 
             { 
                 Mobile m = (Mobile)state;  
             {
-                m.EndAction( typeof( BaseExplosionPotion )); 
+                m.EndAction( typeof( BaseExplosionPotion ));
+//RedemptionUO End                 
 			}
 		}
 	}

@@ -20,7 +20,7 @@ namespace Server.Misc
 
 	public class AccountHandler
 	{
-		private static int MaxAccountsPerIP = 4;
+		private static int MaxAccountsPerIP = 4; //RedemptionUO originial value 1;
 		private static bool AutoAccountCreation = true;
 		private static bool RestrictDeletion = !TestCenter.Enabled;
 		private static TimeSpan DeleteDelay = TimeSpan.FromDays( 7.0 );
@@ -37,6 +37,7 @@ namespace Server.Misc
 
 		private static CityInfo[] StartingCities = new CityInfo[]
 			{
+//RedemptionUO Start
 				new CityInfo( "Delucia",	"Delucia",	1011058, 5276, 3991, 37, Map.Felucca  ),
 				new CityInfo( "Yew",		"The Empath Abbey",	1075072, 633,	858,	0, Map.Felucca  ),
 				new CityInfo( "Minoc",		"The Barnacle",		1075073, 2476,	413,	15, Map.Felucca ),
@@ -46,6 +47,7 @@ namespace Server.Misc
 				new CityInfo( "Jhelom",		"The Mercenary Inn",	1075078, 1374,	3826,	0, Map.Felucca  ),
 				new CityInfo( "Skara Brae",	"The Falconer's Inn",	1075079, 618,	2234,	0, Map.Felucca  ),
 				new CityInfo( "Vesper",		"The Ironwood Inn",	1075080, 2771,	976,	0, Map.Felucca  )
+//RedemptionUO End
 			};
 
 		/* Old Haven/Magincia Locations

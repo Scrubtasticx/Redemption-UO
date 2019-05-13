@@ -331,7 +331,7 @@ namespace Server.Items
 		{
 			if ( from.InRange( GetWorldLocation(), (Core.ML ? 3 : 1) ) && CheckAccess( from ) )
 			{
- /*Zycron
+ /*RedemptionUO Start
 				if ( RootParent is BaseCreature )
 				{
 					from.SendLocalizedMessage( 502402 ); // That is inaccessible.
@@ -343,7 +343,7 @@ namespace Server.Items
 					from.SendLocalizedMessage( 502406 ); // This book needs time to recharge.
 					return;
 				}
- Zycron*/
+ RedemptionUO End*/
 
 				from.CloseGump( typeof( RunebookGump ) );
 				from.SendGump( new RunebookGump( from, this ) );

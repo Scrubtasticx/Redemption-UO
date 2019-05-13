@@ -104,11 +104,12 @@ namespace Server
 			{
 				new LootPackItem( typeof( BaseInstrument ), 1 )
 			};
-			
+//RedemptionUO Start			
 			public static readonly LootPackItem[] Wands = new LootPackItem[]
 			{
 				new LootPackItem( typeof( BaseWand ), 1 )
 			};
+//RedemptionUO End
 
 
 		public static readonly LootPackItem[] LowScrollItems = new LootPackItem[]
@@ -149,7 +150,7 @@ namespace Server
 				new LootPackItem( typeof( BaseWeapon ), 3 ),
 				new LootPackItem( typeof( BaseRanged ), 1 ),
 				new LootPackItem( typeof( BaseShield ), 1 ),
-/*Zycron				new LootPackItem( typeof( BaseWand ), 1 )      Zycron*/
+//             	new LootPackItem( typeof( BaseWand ), 1 ) //RedemptionUO Original value remove line
 			};
 		#endregion
 
@@ -429,7 +430,7 @@ namespace Server
 			{
 				new LootPackEntry(  true, Gold,			100.00, "10d10+350" ),
 				new LootPackEntry( false, Instruments,	  1.00, 1 ),
-				new LootPackEntry( false, Wands,	  5.00, 1 ),
+				new LootPackEntry( false, Wands,	  5.00, 1 ), //RedemptionUO Original value remove line
 				new LootPackEntry( false, OldMagicItems, 20.00, 1, 1, 60, 100 ),
 				new LootPackEntry( false, OldMagicItems, 10.00, 1, 1, 65, 100 ),
 				new LootPackEntry( false, OldMagicItems,  1.00, 1, 1, 70, 100 )
@@ -439,7 +440,7 @@ namespace Server
 			{
 				new LootPackEntry(  true, Gold,			100.00, "2d125+500" ),
 				new LootPackEntry( false, Instruments,	  2.00, 1 ),
-				new LootPackEntry( false, Wands,	  75.00, 1 ),
+				new LootPackEntry( false, Wands,	  75.00, 1 ), //RedemptionUO Original value remove line
 				new LootPackEntry( false, OldMagicItems, 33.00, 1, 1, 50, 100 ),
 				new LootPackEntry( false, OldMagicItems, 33.00, 1, 1, 60, 100 ),
 				new LootPackEntry( false, OldMagicItems, 20.00, 1, 1, 70, 100 ),
@@ -450,7 +451,7 @@ namespace Server
 			{
 				new LootPackEntry(  true, Gold,			100.00, "5d100+600" ),
 				new LootPackEntry( false, Instruments,	  2.00, 1 ),
-				new LootPackEntry( false, Wands,	  100.00, 1 ),
+				new LootPackEntry( false, Wands,	  100.00, 1 ), //RedemptionUO Original value remove line
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 40, 100 ),
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 40, 100 ),
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 50, 100 ),
@@ -463,7 +464,7 @@ namespace Server
 			{
 				new LootPackEntry(  true, Gold,			100.00, "5d100+600" ),
 				new LootPackEntry( false, Instruments,	  2.00, 1 ),
-				new LootPackEntry( false, Wands,	  100.00, 1 ),
+				new LootPackEntry( false, Wands,	  100.00, 1 ), //RedemptionUO Original value remove line
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 40, 100 ),
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 40, 100 ),
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 40, 100 ),
@@ -896,8 +897,10 @@ namespace Server
 					item = Loot.RandomArmorOrHat( inTokuno, isMondain );
 				else if ( m_Type == typeof( BaseShield ) )
 					item = Loot.RandomShield();
+//RedemptionUO Start					
 				else if( m_Type == typeof( BaseWand ) ) //Wands
 					item = Loot.RandomWand();
+//RedemptionUO End
 				else if ( m_Type == typeof( BaseJewel ) )
 					item = Core.AOS ? Loot.RandomJewelry() : Loot.RandomArmorOrShieldOrWeapon();
 				else if ( m_Type == typeof( BaseInstrument ) )
@@ -954,15 +957,15 @@ namespace Server
 		public int Roll()
 		{
 			int v = m_Bonus;
-
+//RedemptionUO Start
 			double eco_Modifier = 100;
 			double w;
-	
+//RedemptionUO End	
 			for ( int i = 0; i < m_Count; ++i )
 				v += Utility.Random( 1, m_Sides );
 
 			return v;
-
+//RedemptionUO Start
 			foreach (Item item in World.Items.Values)
             		{
 				
@@ -975,6 +978,7 @@ namespace Server
             	}
 			w = v * (eco_Modifier * .01);
 			return (int)w;
+//RedemptionUO End			
 		}
 
 		public LootPackDice( string str )

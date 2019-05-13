@@ -330,10 +330,12 @@ namespace Server
 		
 		private static Type[] m_OldWandTypes = new Type[]
 			{
+//RedemptionUO Start				
 				typeof( ClumsyWand ),               typeof( FeebleWand ),           typeof( FireballWand ),
                 typeof( GreaterHealWand ),          typeof( HarmWand ),             typeof( HealWand ),
                 typeof( IDWand ),                   typeof( LightningWand ),        typeof( MagicArrowWand ),
                 typeof( ManaDrainWand ),            typeof( WeaknessWand )
+//RedemptionUO End                
 			};
 		public static Type[] OldWandTypes{ get{ return m_OldWandTypes; } }
 
@@ -423,7 +425,7 @@ namespace Server
 			else if ( Core.AOS )
 				return Construct( m_WandTypes, m_NewWandTypes ) as BaseWand;
 			else
-				return Construct( m_OldWandTypes ) as BaseWand;
+				return Construct( m_OldWandTypes ) as BaseWand; //RedemptionUO Original value m_OldWandTypes, m_WandTypes, m_NewWandTypes
 		}
 
 		public static BaseClothing RandomClothing()

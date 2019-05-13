@@ -4,7 +4,7 @@ using Server;
 using Server.Engines.Craft;
 using Server.Factions;
 using Server.Network;
-using Server.ContextMenus;
+using Server.ContextMenus; //RedemptionUO Original value delete line
 
 namespace Server.Items
 {
@@ -49,7 +49,7 @@ namespace Server.Items
 		private Mobile m_Crafter;
 		private ClothingQuality m_Quality;
 		private bool m_PlayerConstructed;
-        private bool m_CBDBlessed;
+        private bool m_CBDBlessed; //RedemptionUO Original value delete line
 		protected CraftResource m_Resource;
 		private int m_StrReq = -1;
 
@@ -116,6 +116,7 @@ namespace Server.Items
 			set{ m_PlayerConstructed = value; }
 		}
 
+//RedemptionUO Start
         [CommandProperty(AccessLevel.GameMaster)]
         public bool CBDBlessed
         {
@@ -170,7 +171,7 @@ namespace Server.Items
                 }
             }
         }
-
+//RedemptionUO End
 		public virtual CraftResource DefaultResource{ get{ return CraftResource.None; } }
 
 		[CommandProperty( AccessLevel.GameMaster )]
@@ -806,11 +807,11 @@ namespace Server.Items
 		public override void Serialize( GenericWriter writer )
 		{
 			base.Serialize( writer );
-
+//RedemptionUO Start
 			writer.Write( (int) 6 ); // version
 
             writer.Write((bool)m_CBDBlessed);
-
+//RedemptionUO End
 			SaveFlag flags = SaveFlag.None;
 
 			SetSaveFlag( ref flags, SaveFlag.Resource,			m_Resource != DefaultResource );
@@ -866,12 +867,14 @@ namespace Server.Items
 
 			switch ( version )
 			{
+//RedemptionUO Start				
                 case 6:
                     {
                         m_CBDBlessed = reader.ReadBool();
                         goto case 5;
 
                     }
+//RedemptionUO End                    
 				case 5:
 				{
 					SaveFlag flags = (SaveFlag)reader.ReadEncodedInt();

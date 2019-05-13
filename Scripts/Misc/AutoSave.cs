@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using Server;
 using Server.Commands;
-using Server.Gumps;
-using Server.Network;
+using Server.Gumps; //RedemptionUO Original value remove line
+using Server.Network; //RedemptionUO Original value remove line
 
 namespace Server.Misc
 {
@@ -87,23 +87,23 @@ namespace Server.Misc
 
 			try{ Backup(); }
 			catch ( Exception e ) { Console.WriteLine("WARNING: Automatic backup FAILED: {0}", e); }
-			
+//RedemptionUO Start			
 			NetState.Instances.ForEach(
 		delegate( NetState ns )
 		{
 			if( ns.Mobile != null )
 				ns.Mobile.SendGump( new SaveGump() );
 		} );
-
+//RedemptionUO End
 			World.Save( true, permitBackgroundWrite );
-			
+//RedemptionUO Start			
 			NetState.Instances.ForEach(
 		delegate( NetState ns )
 		{
 			if( ns.Mobile != null )
 				ns.Mobile.CloseGump( typeof( SaveGump ) );
 		} );
-		
+//RedemptionUO End		
 		}
 
 		private static string[] m_Backups = new string[]
@@ -202,6 +202,7 @@ namespace Server.Misc
 				);
 		}
 	}
+//RedemptionUO Start	
 	public class SaveGump : Gump
     {
         public SaveGump()
@@ -220,4 +221,5 @@ namespace Server.Misc
             this.AddItem(360, 50, 6168);
         }
     }
+//RedemptionUO End    
 }

@@ -9,7 +9,7 @@ using Server.ContextMenus;
 
 namespace Server.Items
 {
-	public class HouseTeleporter : Item//Zycron , ISecurable
+	public class HouseTeleporter : Item//RedemptionUO Original value -> , ISecurable
 	{
 		private Item m_Target;
 		private SecureLevel m_Level;
@@ -45,9 +45,8 @@ namespace Server.Items
 		public bool CheckAccess( Mobile m )
 		{
 			BaseHouse house = BaseHouse.FindHouseAt( this );
-/* Zycron change this is original code.			
-			if ( house != null && (house.Public ? house.IsBanned( m ) : !house.HasAccess( m )) )
-*/
+		
+//			if ( house != null && (house.Public ? house.IsBanned( m ) : !house.HasAccess( m )) ) //RedemptionUO Original value uncomment
 			if ( house != null && ( !Core.AOS ? house.IsBanned( m ) : !house.HasAccess( m )) )
 				return false;
 

@@ -9,8 +9,10 @@ namespace Server.Items
 
 		public BaseRefreshPotion( PotionEffect effect ) : base( 0xF0B, effect )
 		{
+//RedemptionUO Start			
 			Stackable = true;
 			Weight = 1.0;
+//RedemptionUO End			
 		}
 
 		public BaseRefreshPotion( Serial serial ) : base( serial )

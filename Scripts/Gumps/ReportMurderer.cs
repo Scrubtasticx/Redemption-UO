@@ -179,7 +179,7 @@ namespace Server.Gumps
 								pk.SendLocalizedMessage(501562); // You have been suspended by the Thieves Guild.
 							}
 						}
-						
+//RedemptionUO Start						
 						from.SendGump( new CreateBountyGump( from, killer ) );
 					}
 					break;
@@ -188,6 +188,7 @@ namespace Server.Gumps
 				{
 					Mobile killer = (Mobile)m_Killers[m_Idx];
 					from.SendGump( new CreateBountyGump( from, killer ) );
+//RedemptionUO End
 					break;
 				}
 			}

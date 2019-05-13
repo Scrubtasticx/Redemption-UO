@@ -76,9 +76,8 @@ namespace Server.SkillHandlers
 				}
 
 				double skillVal = m.Skills[SkillName.Meditation].Value;
-/*Zycron Edit				double chance = (50.0 + (( skillVal - ( m.ManaMax - m.Mana ) ) * 2)) / 100;
- Zycron Edit*/
-                double chance = skillVal / 100;
+//				double chance = (50.0 + (( skillVal - ( m.ManaMax - m.Mana ) ) * 2)) / 100;
+                double chance = skillVal / 100; //RedemptionUO Original value remove this line uncomment above
 
 				if ( chance > Utility.RandomDouble() )
 				{

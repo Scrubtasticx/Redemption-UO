@@ -49,7 +49,7 @@ namespace Server.Spells.Third
 				{
 					int level;
 
-					if ( !Core.AOS )
+					if ( !Core.AOS ) //RedemptionUO Original value Core.AOS
 					{
 						if ( Caster.InRange( m, 2 ) )
 						{

@@ -92,7 +92,7 @@ namespace Server.Items
 		}
 	}
 
-	public abstract class BaseHouseDoor : BaseDoor
+	public abstract class BaseHouseDoor : BaseDoor //RedemptionUO Original value ,ISecurable
 	{
 		private DoorFacing m_Facing;
 		private SecureLevel m_Level;
@@ -166,10 +166,10 @@ namespace Server.Items
 		{
 			BaseHouse house = FindHouse();
 
-			return ( house == null || house != null );
+			return ( house == null || house != null ); //RedemptionUO Original value !house.IsAosRules
 		}
 
-/*Zycron Remove 		
+/*RedemptionUO Start		
 		public override void Use( Mobile from )
 		{
 			if ( !CheckAccess( from ) )
@@ -177,7 +177,7 @@ namespace Server.Items
 			else
 				base.Use( from );
 		}
-Zycron End Remove*/
+RedemptionUO End*/
 		public BaseHouseDoor( Serial serial ) : base( serial )
 		{
 		}

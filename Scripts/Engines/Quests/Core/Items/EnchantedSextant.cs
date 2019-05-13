@@ -86,19 +86,19 @@ namespace Server.Items
 
 			Point2D[] banks;
 			PMList moongates;
-			/*Zycron
+/*RedemptionUO Start
 			if ( from.Map == Map.Trammel )
 			{
 				banks = m_TrammelBanks;
 				moongates = PMList.Trammel;
 			}
-			Zycron*/
+RedemptionUO End*/
 			if ( from.Map == Map.Felucca )
 			{
 				banks = m_FeluccaBanks;
 				moongates = PMList.Felucca;
 			}
-			/*Zycron
+/*RedemptionUO Start
 			else if ( from.Map == Map.Ilshenar )
 			{
 #if false
@@ -114,7 +114,7 @@ namespace Server.Items
 				banks = m_MalasBanks;
 				moongates = PMList.Malas;
 			}
-			Zycron*/
+RedemptionUO End*/
 			else
 			{
 				banks = null;

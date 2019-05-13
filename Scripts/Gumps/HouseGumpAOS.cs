@@ -27,10 +27,10 @@ namespace Server.Gumps
 		ListFriend,
 		RemoveBan,
 		ListBan,
-/*Zycron		
+/*RedemptionUO Start		
 		RemoveAccess,
 		ListAccess,
-Zycron*/		
+RedemptionUO End*/		
 		ChangePost,
 		Vendors
 	}
@@ -260,18 +260,18 @@ Zycron*/
 			if ( !isFriend )
 				return;
 
-			if ( house != null )
+			if ( house != null ) //RedemptionUO Original value house.Public
 			{
 				AddButtonLabeled( 10, 390, GetButtonID( 0, 0 ), 1060674 ); // Banish
 				AddButtonLabeled( 10, 410, GetButtonID( 0, 1 ), 1011261 ); // Lift a Ban
 			}
-/*Zycron
+/*RedemptionUO Start
 			else
 			{
 				AddButtonLabeled( 10, 390, GetButtonID( 0, 2 ), 1060676 ); // Grant Access
 				AddButtonLabeled( 10, 410, GetButtonID( 0, 3 ), 1060677 ); // Revoke Access
 			}
-Zycron*/
+RedemptionUO End*/
 			AddPageButton( 150, 10, GetButtonID( 1, 0 ), 1060668, HouseGumpPageAOS.Information );
 			AddPageButton( 150, 30, GetButtonID( 1, 1 ), 1060669, HouseGumpPageAOS.Security );
 			AddPageButton( 150, 50, GetButtonID( 1, 2 ), 1060670, HouseGumpPageAOS.Storage );
@@ -347,11 +347,12 @@ Zycron*/
 					}
 					else
 					{
+//RedemptionUO Start
 						AddButtonLabeled( 10, 310, GetButtonID( 3, 8 ), 1011260 ); // View Ban List
 						AddButtonLabeled( 10, 330, GetButtonID( 3, 9 ), 1060698 ); // Clear Ban List
 						
 						AddButtonLabeled(210, 170, GetButtonID(3, 14), 1011247); // Change the house locks
-
+//RedemptionUO End
 						AddHtmlLocalized( 245, 130, 240, 20, 1060695, SelectedColor, false, false ); // Change to Private
 
 						AddButtonLabeled( 210, 150, GetButtonID( 3, 13 ), 1060694, isOwner ); // Change to Public
@@ -566,7 +567,7 @@ Zycron*/
 					AddList( house.Bans, -1, true, true, from );
 					break;
 				}
-/*Zycron
+/*RedemptionUO Start
 				case HouseGumpPageAOS.RemoveAccess:
 				{
 					AddHtmlLocalized( 10, 120, 400, 20, 1060732, LabelColor, false, false ); // <CENTER>ACCESS LIST</CENTER>
@@ -579,7 +580,7 @@ Zycron*/
 					AddList( house.Access, -1, false, true, from );
 					break;
 				}
-Zycron*/				
+RedemptionUO End*/				
 				case HouseGumpPageAOS.ChangePost:
 				{
 					int index = 0;
@@ -889,7 +890,7 @@ Zycron*/
 					{
 						case 0: // Banish
 						{
-							if ( m_House !=null )
+							if ( m_House !=null ) //RedemptionUO Original value mHouse.Public
 							{
 								from.SendLocalizedMessage( 501325 ); // Target the individual to ban from this house.
 								from.Target = new HouseBanTarget( true, m_House );
@@ -899,12 +900,12 @@ Zycron*/
 						}
 						case 1: // Lift Ban
 						{
-							if ( /*m_House.Public*/m_House !=null )
+							if ( /*m_House.Public*/m_House !=null ) //RedemptionUO Original value m_House.Public
 								from.SendGump( new HouseGumpAOS( HouseGumpPageAOS.RemoveBan, from, m_House ) );
 
 							break;
 						}
-/*Zycron						
+/*RedemptionUO Start						
 						case 2: // Grant Access
 						{
 							if ( !m_House.Public )
@@ -922,7 +923,7 @@ Zycron*/
 
 							break;
 						}
-Zycron*/						
+RedemptionUO End*/						
 					}
 
 					break;
@@ -1021,7 +1022,7 @@ Zycron*/
 
 							break;
 						}
-/*Zycron						
+/*RedemptionUO Start					
 						case 10: // View Access List
 						{
 							from.SendGump( new HouseGumpAOS( HouseGumpPageAOS.ListAccess, from, m_House ) );
@@ -1034,7 +1035,7 @@ Zycron*/
 
 							break;
 						}
-Zycron*/						
+RedemptionUO End*/						
 						case 12: // Make Private
 						{
 							if ( isOwner )
@@ -1107,6 +1108,7 @@ Zycron*/
 
 							break;
 						}
+//RedemptionUO Start
                         case 14: // Change locks
                         {
                             if (m_House.Public)
@@ -1130,7 +1132,7 @@ Zycron*/
 
                             break;
                         }
-
+//RedemptionUO End
 					}
 
 					break;
@@ -1424,7 +1426,7 @@ Zycron*/
 
 					break;
 				}
-/*Zycron				
+/*RedemptionUO Start				
 				case 13:
 				{
 					if ( m_List != null && index >= 0 && index < m_List.Count )
@@ -1439,7 +1441,7 @@ Zycron*/
 
 					break;
 				}
-Zycron*/				
+RedemptionUO End*/				
 				case 14:
 				{
 					if ( isOwner && isCustomizable && index >= 0 && index < m_PostNumbers.Length )

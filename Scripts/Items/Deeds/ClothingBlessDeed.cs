@@ -49,7 +49,7 @@ namespace Server.Items
 				else
 				{
 					item.LootType = LootType.Blessed;
-                    ((BaseClothing)item).CBDBlessed = true;
+                    ((BaseClothing)item).CBDBlessed = true; //RedemptionUO Original value delete line
 					from.SendLocalizedMessage( 1010026 ); // You bless the item....
 
 					m_Deed.Delete(); // Delete the bless deed

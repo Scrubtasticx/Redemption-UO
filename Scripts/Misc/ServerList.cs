@@ -86,6 +86,7 @@ namespace Server.Misc
 
 		private static void AutoDetection()
 		{
+//RedemptionUO Start			
 			if (!HasPublicIPAddress())
 			{
 				Utility.PushColor(ConsoleColor.Yellow);
@@ -104,6 +105,7 @@ namespace Server.Misc
 					Utility.PushColor(ConsoleColor.Red);
 					Console.WriteLine( "failed" );
 					Utility.PopColor();
+//RedemptionUO End					
 			}
 		}
 

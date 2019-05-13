@@ -10,8 +10,10 @@ namespace Server.Items
 
 		public BaseAgilityPotion( PotionEffect effect ) : base( 0xF08, effect )
 		{
+//RedemptionUO Start			
 			Stackable = true;
 			Weight = 1.0;
+//RedemptionUO End		
 		}
 
 		public BaseAgilityPotion( Serial serial ) : base( serial )

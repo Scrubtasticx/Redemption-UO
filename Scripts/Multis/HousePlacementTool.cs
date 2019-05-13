@@ -645,8 +645,10 @@ namespace Server.Items
 
 		private static HousePlacementEntry[] m_ClassicHouses = new HousePlacementEntry[]
 			{
+//RedemptionUO Start				
 				new HousePlacementEntry( typeof( BlueTent ),        	1041217,  	425,    212,    350,   	150,    3,  24000,  	0,  4,  0,  0x70    ),
 				new HousePlacementEntry( typeof( GreenTent ),      	    1041218,    425,    212,    350,    150,    3,  24000,  	0,  4,  0,  0x72    ),
+//RedemptionUO End			
 				new HousePlacementEntry( typeof( SmallOldHouse ),		1011303,	425,	212,	489,	244,	10,	37000,		0,	4,	0,	0x0064	),
 				new HousePlacementEntry( typeof( SmallOldHouse ),		1011304,	425,	212,	489,	244,	10,	37000,		0,	4,	0,	0x0066	),
 				new HousePlacementEntry( typeof( SmallOldHouse ),		1011305,	425,	212,	489,	244,	10,	36750,		0,	4,	0,	0x0068	),

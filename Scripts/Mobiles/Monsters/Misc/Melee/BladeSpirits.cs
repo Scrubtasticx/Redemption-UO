@@ -2,8 +2,8 @@ using System;
 using System.Collections;
 using Server.Misc;
 using Server.Items;
-using Server.Mobiles;
-using Server.Spells;
+using Server.Mobiles; //RedemptionUO Original value remove line
+using Server.Spells; //RedemptionUO Original value remove line
 
 namespace Server.Mobiles
 {
@@ -76,7 +76,7 @@ namespace Server.Mobiles
 		{
 			return 0x23A;
 		}
-		
+//RedemptionUO Start		
 		public override void OnGaveMeleeAttack( Mobile defender )
       {
  
@@ -97,7 +97,7 @@ namespace Server.Mobiles
                     defender.ApplyPoison( this, Poison.Lesser );
  
     } 
-				 
+//RedemptionUO End				 
 		public override void OnThink()
 		{
 			if ( Core.SE && Summoned )

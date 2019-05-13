@@ -693,7 +693,7 @@ namespace Server.Guilds
 		}
 		#endregion
 
-		public static bool NewGuildSystem{ get{ return !Core.SE; } }
+		public static bool NewGuildSystem{ get{ return !Core.SE; } } //RedemptionUO Original value Core.SE
 		public static bool OrderChaos{ get{ return !Core.SE; } }
 
 		public static readonly int RegistrationFee = 25000;

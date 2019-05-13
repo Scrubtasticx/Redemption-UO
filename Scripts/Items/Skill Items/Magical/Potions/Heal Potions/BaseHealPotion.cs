@@ -12,8 +12,10 @@ namespace Server.Items
 
 		public BaseHealPotion( PotionEffect effect ) : base( 0xF0C, effect )
 		{
+//RedemptionUO Start			
 			Stackable = true;
 			Weight = 1.0;
+//RedemptionUO End			
 		}
 
 		public BaseHealPotion( Serial serial ) : base( serial )

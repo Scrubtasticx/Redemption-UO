@@ -31,6 +31,7 @@ namespace Server.Misc
 			//PackItem( new Gold( 1000 ) ); // Starting gold can be customized here
 			PackItem( new Dagger() );
 			PackItem( new Candle() );
+//RedemptionUO Start			
 			//PackItem( new Spellbook( UInt64.MaxValue ) );
 			
 			Account account = (Account)m.Account;
@@ -41,7 +42,7 @@ namespace Server.Misc
 				PackItem( new BankCheck( 100000 ) );
 				account.SetTag("AlreadyGotTheirGold", "True");
 			}
-			
+//RedemptionUO End			
 		}
 
 		private static Item MakeNewbie( Item item )
@@ -666,7 +667,7 @@ namespace Server.Misc
 				pm.Profession = args.Profession;
 
 				if ( pm.AccessLevel == AccessLevel.Player && ((Account)pm.Account).Young )
-					young = pm.Young = false;
+					young = pm.Young = false; //RedmptionUO Original value true
 			}
 
 			SetName( newChar, args.Name );

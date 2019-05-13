@@ -25,7 +25,7 @@ using Server.Engines.Craft;
 using Server.Spells.Spellweaving;
 using Server.Engines.PartySystem;
 using Server.Engines.MLQuests;
-using Server.Poker;
+using Server.Poker; //RedemptionUO Original value remove line
 
 namespace Server.Mobiles
 {
@@ -201,14 +201,14 @@ namespace Server.Mobiles
 		private List<Mobile> m_AutoStabled;
 		private List<Mobile> m_AllFollowers;
 		private List<Mobile> m_RecentlyReported;
-
-private PokerGame m_PokerGame; //Edit for Poker System
+//RedemptionUO Start
+private PokerGame m_PokerGame;
 public PokerGame PokerGame
 {
 get { return m_PokerGame; }
 set { m_PokerGame = value; }
 }
-
+//RedemptionUO End
 		#region Getters & Setters
 
 		public List<Mobile> RecentlyReported
@@ -1650,14 +1650,14 @@ set { m_PokerGame = value; }
 		public override void GetContextMenuEntries( Mobile from, List<ContextMenuEntry> list )
 		{
 			base.GetContextMenuEntries( from, list );
-
+//RedemptionUO Start
 			if ( from is PlayerMobile ) {
 			list.Add( new PlayerInfoContextEntry( from as PlayerMobile, this ) );
 			 }
 			
 			if ( from == this )
 			{		
-			
+//RedemptionUO Remove			
 				if ( m_Quest != null )
 					m_Quest.GetContextMenuEntries( list );
 
@@ -1689,7 +1689,7 @@ set { m_PokerGame = value; }
 				{
 					if ( Alive && house.InternalizedVendors.Count > 0 && house.IsOwner( this ) )
 						list.Add( new CallbackEntry( 6204, new ContextCallback( GetVendor ) ) );
-
+//RedemptionUO Start
 					if ( house != null && !Region.IsPartOf( typeof( Engines.ConPVP.SafeZone ) ) ) // Dueling
 						list.Add( new CallbackEntry( 6207, new ContextCallback( LeaveHouse ) ) );
 				}
@@ -1716,6 +1716,7 @@ set { m_PokerGame = value; }
 				}
 
 				if ( Alive && Core.Expansion >= Expansion.None )
+//RedemptionUO End				
 				{
 					Party theirParty = from.Party as Party;
 					Party ourParty = this.Party as Party;
@@ -2687,7 +2688,7 @@ set { m_PokerGame = value; }
 			return false;
 		}
 
-		public override bool RetainPackLocsOnDeath { get { return true; } }
+		public override bool RetainPackLocsOnDeath { get { return true; } } //RedemptionUO Original value remove line
 		
 		public override bool OnBeforeDeath()
 		{
@@ -4003,15 +4004,17 @@ set { m_PokerGame = value; }
 
 		protected override bool OnMove( Direction d )
 		{
-if (m_PokerGame != null) //Start Edit For Poker
+//RedemptionUO Start			
+if (m_PokerGame != null)
 {
 if (!HasGump(typeof(PokerLeaveGump)))
 {
 SendGump(new PokerLeaveGump(this, m_PokerGame));
 return false;
 }
-} //End Edit For Poker
-			if( Core.SE )
+}
+//RedemptionUO End
+			if( Core.SE ) //RedemptionUO Original value !Core.SE
 				return base.OnMove( d );
 
 			if( AccessLevel != AccessLevel.Player )
@@ -4025,7 +4028,7 @@ return false;
 
 					if( running )
 					{
-						if( (AllowedStealthSteps -= 1) <= 0 )
+						if( (AllowedStealthSteps -= 1) <= 0 ) //RedemptionUO Original value change 1 to 2
 							RevealingAction();
 					}
 					else if( AllowedStealthSteps-- <= 0 )

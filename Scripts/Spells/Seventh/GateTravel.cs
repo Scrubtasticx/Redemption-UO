@@ -9,6 +9,7 @@ using Server.Mobiles;
  
 namespace Server.Spells.Seventh
 {
+//RedemptionUO Start	
         public class GateTravelSpell : MagerySpell
         {
                 private static SpellInfo m_Info = new SpellInfo(
@@ -277,4 +278,5 @@ namespace Server.Spells.Seventh
                         }
                 }
         }
+//RedemptionUO End        
 }

@@ -10,7 +10,7 @@ namespace Server.Engines.ConPVP
 	{
 		public static readonly int SafeZonePriority = HouseRegion.HousePriority + 1;
 
-		public override bool AllowReds{ get{ return true; } }
+		public override bool AllowReds{ get{ return true; } } //RedemptionUO Originial value comment whole line
 
 		public SafeZone( Rectangle2D area, Point3D goloc, Map map, bool isGuarded ) : base( null, map, SafeZonePriority, area )
 		{
@@ -36,13 +36,13 @@ namespace Server.Engines.ConPVP
 				m.SendMessage( 0x22, "You are holding a sigil and cannot enter this zone." );
 				return false;
 			}
-			
+//RedemptionUO Start			
 			if ( m.Criminal )
 			{
 			m.SendMessage( 0x22, "Thou'rt a criminal and cannot enter." );
 				return false;
 			}
-
+//RedemptionUO End
 			PlayerMobile pm = m as PlayerMobile;
 
 			if ( pm == null && m is BaseCreature )

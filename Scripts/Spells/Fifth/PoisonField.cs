@@ -165,7 +165,7 @@ namespace Server.Spells.Fifth
 					return;
 
 				Poison p;
-
+//RedemptionUO Start
 				if ( !Core.AOS )
 				{
 					int total = (m_Caster.Skills.Magery.Fixed + m_Caster.Skills.Poisoning.Fixed);
@@ -175,6 +175,7 @@ namespace Server.Spells.Fifth
 					else if ( total > 150 )
 						p = Poison.Greater;
 					else if ( total > 100 )
+//RedemptionUO End
 						p = Poison.Regular;
 					else
 						p = Poison.Lesser;

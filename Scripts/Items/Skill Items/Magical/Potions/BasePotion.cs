@@ -63,9 +63,10 @@ namespace Server.Items
 		public BasePotion( int itemID, PotionEffect effect ) : base( itemID )
 		{
 			m_PotionEffect = effect;
-
-			//Stackable = Core.ML;
-			//Weight = 1.0;
+/*RedemptionUO Start
+			Stackable = Core.ML;
+			Weight = 1.0;
+RedemptionUO End*/			
 		}
 
 		public BasePotion( Serial serial ) : base( serial )
@@ -162,7 +163,7 @@ namespace Server.Items
 			}
 
 			if( version ==  0 )
-			Stackable = true;
+			Stackable = true; //RedemptionUO Original value Core.ML
 		}
 
 		public abstract void Drink( Mobile from );

@@ -226,7 +226,7 @@ namespace Server.Engines.Craft
 			AddCraft( typeof( PlateChest ), 1011078, 1046431, 75.0, 125.0, typeof( IronIngot ), 1044036, 25, 1044037 );
 			AddCraft( typeof( FemalePlateChest ), 1011078, 1046430, 44.1, 94.1, typeof( IronIngot ), 1044036, 20, 1044037 );
 
-			if ( !Core.AOS ) // exact pre-aos functionality unknown
+			if ( !Core.AOS ) // exact pre-aos functionality unknown //RedemptionUO Original value Core.AOS
 				AddCraft( typeof( DragonBardingDeed ), 1011078, 1053012, 72.5, 122.5, typeof( IronIngot ), 1044036, 750, 1044037 );
 
 			if( Core.SE )

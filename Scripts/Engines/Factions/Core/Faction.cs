@@ -576,6 +576,7 @@ namespace Server.Factions
 			CommandSystem.Register( "FactionItemReset", AccessLevel.Administrator, new CommandEventHandler( FactionItemReset_OnCommand ) );
 			CommandSystem.Register( "FactionReset", AccessLevel.Administrator, new CommandEventHandler( FactionReset_OnCommand ) );
 			CommandSystem.Register( "FactionTownReset", AccessLevel.Administrator, new CommandEventHandler( FactionTownReset_OnCommand ) );
+//RedemptionUO Start
 			CommandSystem.Register( "f", AccessLevel.Player, new CommandEventHandler( FactionBroadcast_OnCommand ) );
 		}
 		
@@ -608,7 +609,7 @@ namespace Server.Factions
                 from.SendMessage( 0x22, "You are not in a faction!" );
             }
         }
-
+//RedemptionUO End
 		public static void FactionTownReset_OnCommand( CommandEventArgs e )
 		{
 			List<BaseMonolith> monoliths = BaseMonolith.Monoliths;

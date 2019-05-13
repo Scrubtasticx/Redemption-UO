@@ -282,10 +282,10 @@ namespace Server.Multis
 
 		[CommandProperty( AccessLevel.GameMaster )]
 		public virtual double BonusStorageScalar { get { return (Core.ML ? 1.2 : 1.0); } }
-
+//RedemptionUO Start
 		[CommandProperty(AccessLevel.GameMaster)]
 		public TrashBarrel TrashBarrel { get { return m_Trash; } }
-
+//RedemptionUO End
 		private bool m_Public;
 
 		private HouseRegion m_Region;
@@ -1441,7 +1441,7 @@ namespace Server.Multis
 		{
 			uint value = Key.RandomValue();
 
-			//if ( !IsAosRules )
+			//if ( !IsAosRules ) //RedemptionUO Original value uncomment
 			{
 				Key packKey = new Key( KeyType.Gold );
 				Key bankKey = new Key( KeyType.Gold );
@@ -1532,7 +1532,7 @@ namespace Server.Multis
 			}
 			else
 			{
-				 m_Trash.MoveToWorld(from.Location, from.Map);
+				 m_Trash.MoveToWorld(from.Location, from.Map); //RedemptionUO Original value from.SendLocalizedMessage( 502117 ); // You already have a trash barrel!
 			}
 		}
 
@@ -2240,12 +2240,12 @@ namespace Server.Multis
 			{
 				from.SendLocalizedMessage( 501352 ); // You may not eject someone who is not in your house!
 			}
-/*Zycron			
+/*RedemptionUO Start			
 			else if ( !Public && IsAosRules )
 			{
 				from.SendLocalizedMessage( 1062521 ); // You cannot ban someone from a private house.  Revoke their access instead.
 			}
-Zycron*/			
+RedemptionUO End*/			
 			else if ( targ is BaseCreature && ((BaseCreature)targ).NoHouseRestrictions )
 			{
 				from.SendLocalizedMessage( 1062040 ); // You cannot ban that.
@@ -2290,12 +2290,12 @@ Zycron*/
 		{
 			if ( !IsOwner( from ) || m_CoOwners == null || m_Friends == null )
 				return;
-/*Zycron
+/*RedemptionUO Start
 			if ( IsOwner( targ ) )
 			{
 				from.SendLocalizedMessage( 501360 ); // This person is already the house owner!
 			}
-Zycron*/			
+RedemptionUO End*/			
 			else if ( m_Friends.Contains( targ ) )
 			{
 				from.SendLocalizedMessage( 501361 ); // This person is a friend of the house. Remove them first.
@@ -2304,12 +2304,12 @@ Zycron*/
 			{
 				from.SendLocalizedMessage( 501362 ); // That can't be a co-owner of the house.
 			}
-/*Zycron			
+/*RedemptionUO Start			
 			else if ( HasAccountHouse( targ ) )
 			{
 				from.SendLocalizedMessage( 501364 ); // That person is already a house owner.
 			}
-Zycron*/			
+RedemptionUO End*/			
 			else if ( IsBanned( targ ) )
 			{
 				from.SendLocalizedMessage( 501367 ); // This person is banned!  Unban them first.
@@ -2365,12 +2365,12 @@ Zycron*/
 		{
 			if ( !IsCoOwner( from ) || m_Friends == null || m_CoOwners == null )
 				return;
-/*Zycron
+/*RedemptionUO Start
 			if ( IsOwner( targ ) )
 			{
 				from.SendLocalizedMessage( 501370 ); // This person is already an owner of the house!
 			}
-Zycron*/			
+RedemptionUO End*/			
 			else if ( m_CoOwners.Contains( targ ) )
 			{
 				from.SendLocalizedMessage( 501369 ); // This person is already on your co-owner list!
@@ -3926,10 +3926,10 @@ Zycron*/
 
 				if ( !isOwned )
 					isOwned = house.IsLockedDown( item );
-
+//RedemptionUO Start
 				if (!isOwned)
 					isOwned = house.TrashBarrel == item;
-					
+//RedemptionUO End					
 				if ( isOwned )
 					sec = (ISecurable)item;
 			}

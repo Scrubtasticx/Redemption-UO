@@ -1279,6 +1279,7 @@ namespace Server.Items
 				new LeftArm().MoveToWorld( Location, Map );
 				new RightLeg().MoveToWorld( Location, Map );
 				new RightArm().MoveToWorld( Location, Map );
+//RedemptionUO Start				
 //				new Head( dead.Name ).MoveToWorld( Location, Map );
                 if ( dead is PlayerMobile )
 				{
@@ -1290,7 +1291,7 @@ namespace Server.Items
 				{
 					new Head( dead.Name ).MoveToWorld( Location, Map );
 				}
-
+//RedemptionUO End
 				SetFlag( CorpseFlag.Carved, true );
 
 				ProcessDelta();
