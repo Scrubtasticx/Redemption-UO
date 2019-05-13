@@ -13,15 +13,14 @@ namespace Server
 		{
 			Core.Expansion = Expansion;
 
-//			AccountGold.Enabled = Core.TOL;
-            AccountGold.Enabled = true;
+			AccountGold.Enabled = !Core.TOL;
 			AccountGold.ConvertOnBank = true;
 			AccountGold.ConvertOnTrade = false;
 			VirtualCheck.UseEditGump = true;
 
 			bool Enabled = Core.AOS;
 
-			Mobile.InsuranceEnabled = Enabled;
+			Mobile.InsuranceEnabled = Core.TOL;
 			ObjectPropertyList.Enabled = Enabled;
 			Mobile.VisibleDamageType = Enabled ? VisibleDamageType.Related : VisibleDamageType.None;
 			Mobile.GuildClickMessage = !Enabled;
