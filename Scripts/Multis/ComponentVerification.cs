@@ -30,7 +30,7 @@ namespace Server.Multis
 			if ( val == -1 )
 				return false;
 
-			return ( val == 0 || ((int)ExpansionInfo.CoreExpansion.CustomHousingFlag & val) != 0 );
+			return ( val == 0 || (0x4060FB & val) != 0 || (0xD02C0 & val) != 0  ); //RedemptionUO Original value return ( val == 0 || ((int)ExpansionInfo.CoreExpansion.CustomHousingFlag & val) != 0 );
 		}
 
 		public ComponentVerification()
