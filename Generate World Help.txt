@@ -1,5 +1,3 @@
-Just type [createworld in game
-
 [Decorate
 [DecorateMag
 [Doorgen
