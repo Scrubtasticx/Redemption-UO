@@ -13,7 +13,7 @@ namespace Server.Engines.MyRunUO
         public const string DatabaseServer = "localhost";
         public const string DatabaseName = "ultima";
         public const string DatabaseUserID = "root";
-        public const string DatabasePassword = "Kakashizoro81";
+        public const string DatabasePassword = "";
         // Should the database use transactions? This is recommended
         public static bool UseTransactions = true;
         // Use optimized table loading techniques? (LOAD DATA INFILE)
