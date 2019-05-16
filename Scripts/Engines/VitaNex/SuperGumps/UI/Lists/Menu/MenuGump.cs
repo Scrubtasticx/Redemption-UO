@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,11 +12,11 @@
 #region References
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 
 using Server;
 using Server.Gumps;
-using Server.Mobiles;
 
 using VitaNex.Text;
 #endregion
@@ -26,13 +26,18 @@ namespace VitaNex.SuperGumps.UI
 	public class MenuGump : SuperGumpList<ListGumpEntry>
 	{
 		public int GuessWidth { get; protected set; }
+
+		public int EntryHeight { get; set; }
+
 		public GumpButton Clicked { get; set; }
+
 		public ListGumpEntry Selected { get; set; }
 
-		public MenuGump(
-			PlayerMobile user, Gump parent = null, IEnumerable<ListGumpEntry> list = null, GumpButton clicked = null)
-			: base(user, parent, DefaultX, DefaultY, list ?? new ListGumpEntry[0])
+		public MenuGump(Mobile user, Gump parent = null, IEnumerable<ListGumpEntry> list = null, GumpButton clicked = null)
+			: base(user, parent, DefaultX, DefaultY, list)
 		{
+			EntryHeight = 30;
+
 			Clicked = clicked;
 
 			if (Clicked != null)
@@ -52,11 +57,21 @@ namespace VitaNex.SuperGumps.UI
 					X = Parent.X;
 					Y = Parent.Y;
 				}
+				else
+				{
+					X = DefaultX;
+					Y = DefaultY;
+				}
 			}
 			else if (Parent != null)
 			{
 				X = Parent.X;
 				Y = Parent.Y;
+			}
+			else
+			{
+				X = DefaultX;
+				Y = DefaultY;
 			}
 
 			ForceRecompile = true;
@@ -67,11 +82,36 @@ namespace VitaNex.SuperGumps.UI
 
 		protected virtual void InvalidateWidth()
 		{
-			int idx = 0;
-			double per = EntriesPerPage;
+			double epp = EntriesPerPage;
 
-			GuessWidth =
-				(int)List.Max(e => GetLabelText(idx, (int)Math.Ceiling(++idx / per), e).ComputeWidth(UOFont.Font0) * 0.85) + 50;
+			GuessWidth = 100;
+
+			if (epp > 0)
+			{
+				var font = UOFont.Unicode[1];
+
+				GuessWidth += List.Select((e, i) => font.GetWidth(GetLabelText(i, (int)Math.Ceiling(i + 1 / epp), e))).Highest();
+			}
+		}
+
+		public void AddOption(string label, Action handler)
+		{
+			List.Add(new ListGumpEntry(label, handler));
+		}
+
+		public void AddOption(string label, Action handler, int hue)
+		{
+			List.Add(new ListGumpEntry(label, handler, hue));
+		}
+
+		public void AddOption(string label, Action<GumpButton> handler)
+		{
+			List.Add(new ListGumpEntry(label, handler));
+		}
+
+		public void AddOption(string label, Action<GumpButton> handler, int hue)
+		{
+			List.Add(new ListGumpEntry(label, handler, hue));
 		}
 
 		protected override void CompileLayout(SuperGumpLayout layout)
@@ -80,57 +120,95 @@ namespace VitaNex.SuperGumps.UI
 
 			var range = GetListRange();
 
+			var eh = range.Count * EntryHeight;
+
+			var sup = SupportsUltimaStore;
+			var ec = IsEnhancedClient;
+			var bgID = ec ? 83 : sup ? 40000 : 9270;
+
 			layout.Add(
 				"background/body/base",
 				() =>
 				{
-					AddBackground(0, 0, GuessWidth, 30 + (range.Count * 30), 9270);
-					AddImageTiled(10, 10, GuessWidth - 20, 10 + (range.Count * 30), 2624);
-					//AddAlphaRegion(10, 10, GuessWidth - 20, 10 + (range.Count * 30));
+					AddBackground(0, 0, GuessWidth, 30 + eh, bgID);
+
+					if (!sup)
+					{
+						AddImageTiled(10, 10, GuessWidth - 20, 10 + eh, 2624);
+						//AddAlphaRegion(10, 10, GuessWidth - 20, 10 + eh);
+					}
 				});
 
-			layout.Add("imagetiled/body/vsep/0", () => AddImageTiled(50, 20, 5, range.Count * 30, 9275));
+			layout.Add(
+				"imagetiled/body/vsep/0",
+				() =>
+				{
+					if (!sup || ec)
+					{
+						AddImageTiled(50, 20, 5, eh, bgID + 5);
+					}
+				});
 
 			CompileEntryLayout(layout, range);
 
 			layout.Add(
 				"widget/body/scrollbar",
-				() =>
-				AddScrollbarH(
+				() => AddScrollbarH(
 					6,
 					6,
 					PageCount,
 					Page,
 					PreviousPage,
 					NextPage,
-					new Rectangle2D(30, 0, GuessWidth - 72, 13),
-					new Rectangle2D(0, 0, 28, 13),
-					new Rectangle2D(GuessWidth - 40, 0, 28, 13)));
+					new Rectangle(30, 0, GuessWidth - 72, 13),
+					new Rectangle(0, 0, 28, 13),
+					new Rectangle(GuessWidth - 40, 0, 28, 13)));
 		}
 
 		public virtual void CompileEntryLayout(SuperGumpLayout layout, Dictionary<int, ListGumpEntry> range)
 		{
-			range.For((i, kv) => CompileEntryLayout(layout, range.Count, kv.Key, i, 25 + (i * 30), kv.Value));
+			range.For((i, kv) => CompileEntryLayout(layout, range.Count, kv.Key, i, 25 + (i * EntryHeight), kv.Value));
 		}
 
 		public virtual void CompileEntryLayout(
-			SuperGumpLayout layout, int length, int index, int pIndex, int yOffset, ListGumpEntry entry)
+			SuperGumpLayout layout,
+			int length,
+			int index,
+			int pIndex,
+			int yOffset,
+			ListGumpEntry entry)
 		{
+			var sup = SupportsUltimaStore;
+			var ec = IsEnhancedClient;
+			var bgID = ec ? 83 : sup ? 40000 : 9270;
+
 			layout.Add("button/list/select/" + index, () => AddButton(15, yOffset, 4006, 4007, b => SelectEntry(b, entry)));
 
 			layout.Add(
 				"label/list/entry/" + index,
-				() =>
-				AddLabelCropped(
-					65, 2 + yOffset, GuessWidth - 75, 20, GetLabelHue(index, pIndex, entry), GetLabelText(index, pIndex, entry)));
+				() => AddLabelCropped(
+					65,
+					2 + yOffset,
+					GuessWidth - 75,
+					20,
+					GetLabelHue(index, pIndex, entry),
+					GetLabelText(index, pIndex, entry)));
 
 			if (pIndex < (length - 1))
 			{
-				layout.Add("imagetiled/body/hsep/" + index, () => AddImageTiled(10, 25 + yOffset, GuessWidth - 20, 5, 9277));
+				layout.Add(
+					"imagetiled/body/hsep/" + index,
+					() =>
+					{
+						if (!ec)
+						{
+							AddImageTiled(10, 25 + yOffset, GuessWidth - 20, 5, bgID + 7);
+						}
+					});
 			}
 		}
 
-		protected override sealed void CompileList(List<ListGumpEntry> list)
+		protected sealed override void CompileList(List<ListGumpEntry> list)
 		{
 			var opts = new MenuGumpOptions(list);
 

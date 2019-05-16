@@ -3,14 +3,15 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
-using System.Collections.Generic;
+using System;
+using System.Linq;
 
 using Server;
 using Server.Mobiles;
@@ -23,92 +24,125 @@ namespace VitaNex.Modules.AutoPvP
 		[CommandProperty(AutoPvP.Access)]
 		public virtual bool Ranked { get; set; }
 
-		public Dictionary<PlayerMobile, PvPProfileHistoryEntry> Statistics { get; private set; }
-		public Dictionary<PlayerMobile, PvPProfileHistoryEntry> StatisticsCache { get; private set; }
-
-		public PvPProfileHistoryEntry EnsureStatistics(PlayerMobile pm)
+		public long GetStatistic(PlayerMobile pm, Func<PvPProfileHistoryEntry, long> fetch)
 		{
-			return EnsureStatistics(pm, false);
+			if (pm == null || fetch == null)
+			{
+				return 0;
+			}
+
+			return Teams.Aggregate(0L, (v, t) => v + GetStatistic(t, pm, fetch));
 		}
 
-		public PvPProfileHistoryEntry EnsureStatistics(PlayerMobile pm, bool replace)
+		public long GetStatistic(PvPTeam t, PlayerMobile pm, Func<PvPProfileHistoryEntry, long> fetch)
 		{
-			PvPProfileHistoryEntry entry;
-
-			if (!Statistics.TryGetValue(pm, out entry))
+			if (t == null || t.Deleted || pm == null || fetch == null)
 			{
-				Statistics.Add(pm, entry = new PvPProfileHistoryEntry(AutoPvP.CurrentSeason.Number));
-			}
-			else if (entry == null || replace)
-			{
-				Statistics[pm] = entry = new PvPProfileHistoryEntry(AutoPvP.CurrentSeason.Number);
+				return 0;
 			}
 
-			if (!StatisticsCache.ContainsKey(pm))
+			var s = t.GetStatistics(pm);
+
+			if (s != null)
 			{
-				StatisticsCache.Add(pm, entry);
-			}
-			else
-			{
-				StatisticsCache[pm] = entry;
+				return VitaNexCore.TryCatchGet(fetch, s, AutoPvP.CMOptions.ToConsole);
 			}
 
-			return entry;
+			return 0;
 		}
 
-		public void TransferStatistics()
+		public bool UpdateStatistics(PvPTeam t, PlayerMobile pm, Action<PvPProfileHistoryEntry> update)
 		{
-			foreach (PlayerMobile pm in Statistics.Keys)
+			if (t == null || t.Deleted || pm == null || update == null)
 			{
-				TransferStatistics(pm);
+				return false;
 			}
 
-			OnTransferStatistics();
+			var s = t.GetStatistics(pm);
 
-			Statistics.Clear();
+			if (s == null)
+			{
+				return false;
+			}
+
+			var success = true;
+
+			VitaNexCore.TryCatch(
+				update,
+				s,
+				x =>
+				{
+					AutoPvP.CMOptions.ToConsole(x);
+					success = false;
+				});
+
+			if (t.IsMember(pm))
+			{
+				t.UpdateActivity(pm);
+			}
+
+			return success;
 		}
 
-		public void TransferStatistics(PlayerMobile pm)
+		public void ResetStatistics()
 		{
-			if (!Ranked)
+			ForEachTeam(ResetStatistics);
+		}
+
+		public void ResetStatistics(PvPTeam t)
+		{
+			if (t != null)
 			{
-				Statistics.Remove(pm);
+				t.Statistics.Clear();
+			}
+		}
+
+		private void TransferStatistics()
+		{
+			ForEachTeam(TransferStatistics);
+		}
+
+		private void TransferStatistics(PvPTeam t)
+		{
+			if (t != null)
+			{
+				t.Statistics.ForEachReverse(o => TransferStatistics(o.Key, o.Value));
+			}
+		}
+
+		private void TransferStatistics(PlayerMobile pm, PvPProfileHistoryEntry e)
+		{
+			var profile = AutoPvP.EnsureProfile(pm);
+
+			OnTransferStatistics(profile, e);
+			OnTransferPoints(profile, e.Points);
+		}
+
+		protected virtual void OnTransferStatistics(PvPProfile profile, PvPProfileHistoryEntry stats)
+		{
+			if (Ranked && profile != null && stats != null)
+			{
+				stats.AddTo(profile.Statistics, true);
+			}
+		}
+
+		protected virtual void OnTransferPoints(PvPProfile profile, long points)
+		{
+			if (!Ranked || profile == null || points == 0)
+			{
 				return;
 			}
 
-			PvPProfile profile = AutoPvP.EnsureProfile(pm);
-			PvPProfileHistoryEntry entry = EnsureStatistics(pm);
+			profile.RawPoints += points;
 
-			OnTransferStatistics(pm, profile.Statistics, entry);
-
-			Statistics.Remove(pm);
-		}
-
-		protected virtual void OnTransferStatistics()
-		{ }
-
-		protected virtual void OnTransferStatistics(
-			PlayerMobile pm, PvPProfileHistoryEntry profileStats, PvPProfileHistoryEntry battleStats)
-		{
-			if (!Ranked || profileStats == null || battleStats == null)
+			if (IsOnline(profile.Owner))
 			{
-				return;
-			}
-
-			profileStats.Battles += battleStats.Battles;
-			profileStats.Wins += battleStats.Wins;
-			profileStats.Losses += battleStats.Losses;
-			profileStats.Kills += battleStats.Kills;
-			profileStats.Deaths += battleStats.Deaths;
-			profileStats.Resurrections += battleStats.Resurrections;
-			profileStats.DamageTaken += battleStats.DamageTaken;
-			profileStats.DamageDone += battleStats.DamageDone;
-			profileStats.HealingTaken += battleStats.HealingTaken;
-			profileStats.HealingDone += battleStats.HealingDone;
-
-			foreach (var kvp in battleStats.MiscStats)
-			{
-				profileStats[kvp.Key] += kvp.Value;
+				profile.Owner.SendMessage(
+					"You have {0} {1:#,0} Battle Point{2} from {3}!",
+					points > 0 ? "gained" : "lost",
+					points,
+					points != 1 ? "s" : String.Empty,
+					Name);
 			}
 		}
 	}

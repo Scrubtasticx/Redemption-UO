@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -13,6 +13,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+
+using Server.Targeting;
 #endregion
 
 namespace Server
@@ -21,6 +23,9 @@ namespace Server
 	{
 		int H { get; set; }
 
+		bool Intersects(Item e);
+		bool Intersects(Mobile e);
+		bool Intersects(IEntity e);
 		bool Intersects(IPoint3D p);
 		bool Intersects(IBlock3D b);
 		bool Intersects(int z);
@@ -33,6 +38,36 @@ namespace Server
 	public struct Block3D : IBlock3D
 	{
 		public static readonly Block3D Empty = new Block3D(0, 0, 0, 0);
+
+		public static bool Intersects(IPoint3D a, IPoint3D b)
+		{
+			return Create(a).Intersects(Create(b));
+		}
+
+		public static Block3D Create(IPoint3D o)
+		{
+			if (o is Mobile)
+			{
+				return new Block3D(o, 18);
+			}
+
+			if (o is Item)
+			{
+				return new Block3D(o, Math.Max(1, ((Item)o).ItemData.CalcHeight));
+			}
+
+			if (o is LandTarget)
+			{
+				return new Block3D(o, 1);
+			}
+
+			if (o is StaticTarget)
+			{
+				return new Block3D(o, TileData.ItemTable[((StaticTarget)o).ItemID].CalcHeight);
+			}
+
+			return new Block3D(o, 5);
+		}
 
 		public int X { get; set; }
 		public int Y { get; set; }
@@ -56,9 +91,74 @@ namespace Server
 			H = h;
 		}
 
+		public bool Intersects(IEntity e)
+		{
+			if (e is Item)
+			{
+				return Intersects((Item)e);
+			}
+
+			if (e is Mobile)
+			{
+				return Intersects((Mobile)e);
+			}
+
+			return Intersects(e.X, e.Y, e.Z);
+		}
+
 		public bool Intersects(IPoint3D p)
 		{
+			if (p is Item)
+			{
+				return Intersects((Item)p);
+			}
+
+			if (p is Mobile)
+			{
+				return Intersects((Mobile)p);
+			}
+
+			if (p is LandTarget)
+			{
+				return Intersects((LandTarget)p);
+			}
+
+			if (p is StaticTarget)
+			{
+				return Intersects((StaticTarget)p);
+			}
+
 			return Intersects(p.X, p.Y, p.Z);
+		}
+
+		public bool Intersects(Point3D p, int h)
+		{
+			return Intersects(p.X, p.Y, p.Z, h);
+		}
+
+		public bool Intersects(LandTarget o)
+		{
+			return Intersects(o.X, o.Y, o.Z, 1);
+		}
+
+		public bool Intersects(StaticTarget o)
+		{
+			return Intersects(o.X, o.Y, o.Z, Math.Max(1, TileData.ItemTable[o.ItemID].CalcHeight));
+		}
+
+		public bool Intersects(Mobile m)
+		{
+			return Intersects(m.X, m.Y, m.Z, 18);
+		}
+
+		public bool Intersects(Item i)
+		{
+			return Intersects(i.X, i.Y, i.Z, Math.Max(1, i.ItemData.CalcHeight));
+		}
+
+		public bool Intersects(Block3D b)
+		{
+			return Intersects(b.X, b.Y, b.Z, b.H);
 		}
 
 		public bool Intersects(IBlock3D b)
@@ -81,9 +181,82 @@ namespace Server
 			return Intersects(x, y, z, 0);
 		}
 
+		public bool Intersects(Rectangle2D b, int z, int h)
+		{
+			return X >= b.Start.X && X < b.End.X && Y >= b.Start.Y && Y < b.End.Y && Intersects(X, Y, z, h);
+		}
+
+		public bool Intersects(Rectangle3D b)
+		{
+			var z = Math.Min(b.Start.Z, b.End.Z);
+			var h = Math.Abs(b.Depth);
+
+			return X >= b.Start.X && X < b.End.X && Y >= b.Start.Y && Y < b.End.Y && Intersects(X, Y, z, h);
+		}
+
 		public bool Intersects(int x, int y, int z, int h)
 		{
-			return X == x && Y == y && z <= Z + H && z + h >= Z;
+			if (x != X || y != Y)
+			{
+				return false;
+			}
+
+			if (z == Z || z + h == Z + H)
+			{
+				return true;
+			}
+
+			if (z >= Z && z <= Z + H)
+			{
+				return true;
+			}
+
+			if (Z >= z && Z <= z + h)
+			{
+				return true;
+			}
+
+			if (z <= Z && z + h >= Z)
+			{
+				return true;
+			}
+
+			if (Z <= z && Z + H >= z)
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		public Block3D Offset(int x = 0, int y = 0, int z = 0, int h = 0)
+		{
+			X += x;
+			Y += y;
+			Z += z;
+			H += h;
+
+			return this;
+		}
+
+		public Block3D Delta(int x = 0, int y = 0, int z = 0, int h = 0)
+		{
+			X -= x;
+			Y -= y;
+			Z -= z;
+			H -= h;
+
+			return this;
+		}
+
+		public Block3D Normalize(int x = 0, int y = 0, int z = 0, int h = 0)
+		{
+			X = x - X;
+			Y = y - Y;
+			Z = z - Z;
+			H = h - H;
+
+			return this;
 		}
 
 		IEnumerator IEnumerable.GetEnumerator()
@@ -98,7 +271,7 @@ namespace Server
 
 		public IEnumerable<IPoint3D> Scan()
 		{
-			for (int z = Z; z <= Z + H; z++)
+			for (var z = Z; z <= Z + H; z++)
 			{
 				yield return this.ToPoint3D(z);
 			}
@@ -109,27 +282,27 @@ namespace Server
 			return String.Format("{0}, {1}, {2}, {3}", X, Y, Z, H);
 		}
 
-		public bool Equals(IBlock3D b)
-		{
-			return b != null && X == b.X && Y == b.Y && Z == b.Z && H == b.H;
-		}
-
-		public override bool Equals(object obj)
-		{
-			return !ReferenceEquals(obj, null) && (base.Equals(obj) || (obj is IBlock3D && Equals((IBlock3D)obj)));
-		}
-
 		public override int GetHashCode()
 		{
 			unchecked
 			{
-				int hash = 0;
+				var hash = 0;
 				hash = (hash * 397) ^ X;
 				hash = (hash * 397) ^ Y;
 				hash = (hash * 397) ^ Z;
 				hash = (hash * 397) ^ H;
 				return hash;
 			}
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is IBlock3D && Equals((IBlock3D)obj);
+		}
+
+		public bool Equals(IBlock3D b)
+		{
+			return !ReferenceEquals(b, null) && X == b.X && Y == b.Y && Z == b.Z && H == b.H;
 		}
 
 		public static bool operator ==(Block3D a, IBlock3D b)

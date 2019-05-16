@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,11 +21,12 @@ using VitaNex.SuperGumps.UI;
 
 namespace VitaNex.Modules.AutoPvP
 {
-	[ArtworkSupport("7.0.26.0", 19343, 3948)]
 	public class PvPSpectatorGate : FloorTile<PlayerMobile>
 	{
 		[CommandProperty(AutoPvP.Access)]
 		public PvPBattle Battle { get; set; }
+
+		public override bool ForceShowProperties { get { return true; } }
 
 		public PvPSpectatorGate(PvPBattle battle)
 		{
@@ -67,7 +68,10 @@ namespace VitaNex.Modules.AutoPvP
 			if (Battle != null)
 			{
 				list.Add(
-					"Battle: {0}\nStatus: {1} ({2})", Battle.Name, Battle.State, Battle.GetStateTimeLeft().ToSimpleString("h:m:s"));
+					"Battle: {0}\nStatus: {1} ({2})",
+					Battle.Name,
+					Battle.State,
+					Battle.GetStateTimeLeft().ToSimpleString("h:m:s"));
 			}
 		}
 
@@ -88,9 +92,8 @@ namespace VitaNex.Modules.AutoPvP
 						new ConfirmDialogGump(mob)
 						{
 							Title = "Join as Spectator?",
-							Html =
-								"Join " + Battle.Name +
-								" as a spectator.\nYou will be teleported to a safe area where you can watch the battle.\nClick OK to join!",
+							Html = "Join " + Battle.Name +
+								   " as a spectator.\nYou will be teleported to a safe area where you can watch the battle.\nClick OK to join!",
 							AcceptHandler = b => Battle.AddSpectator(mob, true)
 						}.Send();
 					}

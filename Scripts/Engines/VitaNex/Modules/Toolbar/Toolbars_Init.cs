@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,7 +21,7 @@ using VitaNex.IO;
 
 namespace VitaNex.Modules.Toolbar
 {
-	[CoreModule("Toolbars", "1.0.0.0")]
+	[CoreModule("Toolbars", "1.0.0.1")]
 	public static partial class Toolbars
 	{
 		static Toolbars()
@@ -37,7 +37,7 @@ namespace VitaNex.Modules.Toolbar
 				OnDeserialize = Deserialize
 			};
 
-			DefaultEntries = new ToolbarState(null, CMOptions.DefaultWidth, CMOptions.DefaultHeight);
+			DefaultEntries = ToolbarState.NewEmpty;
 		}
 
 		private static void CMConfig()
@@ -76,7 +76,7 @@ namespace VitaNex.Modules.Toolbar
 			VitaNexCore.TryCatch(
 				() =>
 				{
-					DataStoreResult result = Profiles.Export();
+					var result = Profiles.Export();
 					CMOptions.ToConsole("{0} profiles saved, {1}", Profiles.Count > 0 ? Profiles.Count.ToString("#,#") : "0", result);
 				},
 				CMOptions.ToConsole);
@@ -87,38 +87,41 @@ namespace VitaNex.Modules.Toolbar
 			VitaNexCore.TryCatch(
 				() =>
 				{
-					DataStoreResult result = Profiles.Import();
-					CMOptions.ToConsole("{0} profiles loaded, {1}.", Profiles.Count > 0 ? Profiles.Count.ToString("#,#") : "0", result);
+					var result = Profiles.Import();
+					CMOptions.ToConsole(
+						"{0} profiles loaded, {1}.",
+						Profiles.Count > 0 ? Profiles.Count.ToString("#,#") : "0",
+						result);
 				},
 				CMOptions.ToConsole);
 		}
 
 		public static bool Serialize(GenericWriter writer)
 		{
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
 				case 0:
+				{
+					if (DefaultEntries == null)
 					{
-						if (DefaultEntries == null)
-						{
-							writer.Write(false);
-						}
-						else
-						{
-							writer.Write(true);
-							DefaultEntries.Serialize(writer);
-						}
-
-						writer.WriteBlockDictionary(
-							Profiles,
-							(w, k, v) =>
-							{
-								w.Write(k);
-								v.Serialize(w);
-							});
+						writer.Write(false);
 					}
+					else
+					{
+						writer.Write(true);
+						DefaultEntries.Serialize(writer);
+					}
+
+					writer.WriteBlockDictionary(
+						Profiles,
+						(w, k, v) =>
+						{
+							w.Write(k);
+							v.Serialize(w);
+						});
+				}
 					break;
 			}
 
@@ -127,33 +130,33 @@ namespace VitaNex.Modules.Toolbar
 
 		public static bool Deserialize(GenericReader reader)
 		{
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
 				case 0:
+				{
+					if (reader.ReadBool())
 					{
-						if (reader.ReadBool())
+						if (DefaultEntries != null)
 						{
-							if (DefaultEntries != null)
-							{
-								DefaultEntries.Deserialize(reader);
-							}
-							else
-							{
-								DefaultEntries = new ToolbarState(reader);
-							}
+							DefaultEntries.Deserialize(reader);
 						}
-
-						reader.ReadBlockDictionary(
-							r =>
-							{
-								PlayerMobile k = r.ReadMobile<PlayerMobile>();
-								ToolbarState v = new ToolbarState(r);
-								return new KeyValuePair<PlayerMobile, ToolbarState>(k, v);
-							},
-							Profiles);
+						else
+						{
+							DefaultEntries = new ToolbarState(reader);
+						}
 					}
+
+					reader.ReadBlockDictionary(
+						r =>
+						{
+							var k = r.ReadMobile<PlayerMobile>();
+							var v = new ToolbarState(r);
+							return new KeyValuePair<PlayerMobile, ToolbarState>(k, v);
+						},
+						Profiles);
+				}
 					break;
 			}
 

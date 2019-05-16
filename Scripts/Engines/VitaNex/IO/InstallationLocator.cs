@@ -3,11 +3,13 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
+
+#if !MONO
 
 #region References
 using System;
@@ -57,32 +59,33 @@ namespace VitaNex
 			KnownRegistryKeyValueNames = new[] {@"ExePath", @"InstallDir", @"Install Dir", @"GameExecutionPath"};
 
 			Console.WriteLine("Searching for Ultima Online installations...");
+
 			var paths = new List<string>();
 
 			var dpCustom = typeof(DataPath).GetField("CustomPath", BindingFlags.NonPublic | BindingFlags.Static);
 
 			if (dpCustom != null)
 			{
-				string custom = dpCustom.GetValue(null) as string;
+				var custom = dpCustom.GetValue(null) as string;
 
-				if (!String.IsNullOrWhiteSpace(custom) && !paths.Contains(custom))
+				if (!String.IsNullOrWhiteSpace(custom) && !paths.Contains(custom, StringComparer.OrdinalIgnoreCase))
 				{
 					paths.Add(custom);
 				}
 			}
 
-			var cache = IOUtility.EnsureFile(VitaNexCore.BaseDirectory + "/DataPath.bin");
+			var cache = IOUtility.EnsureFile(VitaNexCore.BaseDirectory + "/DataPath.txt");
 
-			cache.Deserialize(
-				r =>
-				{
-					var l = r.ReadArray(r.ReadString);
+			if (paths.Count == 0)
+			{
+				var installs = File.ReadAllLines(cache.FullName)
+								   .Where(path => File.Exists(IOUtility.GetSafeFilePath(path + "/client.exe", true)))
+								   .Union(Locate())
+								   .Distinct(StringComparer.OrdinalIgnoreCase)
+								   .Not(path => paths.Contains(path, StringComparer.OrdinalIgnoreCase));
 
-					paths.AddRange(
-						l.Not(paths.Contains).Where(path => File.Exists(IOUtility.GetSafeFilePath(path + "/client.exe", true))));
-				});
-
-			paths.AddRange(Locate().Not(paths.Contains));
+				paths.AddRange(installs);
+			}
 
 			DetectedPaths = paths.ToArray();
 
@@ -91,6 +94,7 @@ namespace VitaNex
 				Console.WriteLine("Found {0:#,0} Ultima Online installations:", DetectedPaths.Length);
 				DetectedPaths.ForEach(Console.WriteLine);
 
+				Core.DataDirectories.Clear();
 				Core.DataDirectories.AddRange(DetectedPaths);
 			}
 			else
@@ -99,8 +103,8 @@ namespace VitaNex
 
 				if (!Core.Service && Core.DataDirectories.Count == 0)
 				{
-					int attempt = 0;
-					string path = IOUtility.GetSafeDirectoryPath(GetConsoleInput());
+					var attempt = 0;
+					var path = IOUtility.GetSafeDirectoryPath(GetConsoleInput());
 
 					while (String.IsNullOrWhiteSpace(path) && attempt < 3)
 					{
@@ -123,12 +127,12 @@ namespace VitaNex
 				}
 			}
 
-			cache.Serialize(w => w.WriteArray(Core.DataDirectories.ToArray(), w.Write));
+			File.WriteAllLines(cache.FullName, Core.DataDirectories);
 		}
 
 		private static string GetConsoleInput()
 		{
-			Console.WriteLine("Enter the Ultima Online directory:");
+			Console.WriteLine("Enter a path to an Ultima Online directory:");
 			Console.Write("> ");
 
 			return Console.ReadLine();
@@ -136,12 +140,13 @@ namespace VitaNex
 
 		public static IEnumerable<string> Locate()
 		{
-			string prefix = Is64Bit ? @"SOFTWARE\Wow6432Node\" : @"SOFTWARE\";
+			var prefix = Is64Bit ? @"SOFTWARE\Wow6432Node\" : @"SOFTWARE\";
 
-			foreach (string knownKeyName in
-				KnownInstallationRegistryKeys.Where(knownKeyName => !String.IsNullOrWhiteSpace(knownKeyName)))
+			string exePath;
+
+			foreach (var knownKeyName in KnownInstallationRegistryKeys.Where(
+				knownKeyName => !String.IsNullOrWhiteSpace(knownKeyName)))
 			{
-				string exePath;
 				TryGetExePath(prefix + knownKeyName, out exePath);
 
 				if (!String.IsNullOrWhiteSpace(exePath))
@@ -155,7 +160,7 @@ namespace VitaNex
 		{
 			try
 			{
-				using (RegistryKey key = Registry.LocalMachine.OpenSubKey(regPath) ?? Registry.CurrentUser.OpenSubKey(regPath))
+				using (var key = Registry.LocalMachine.OpenSubKey(regPath) ?? Registry.CurrentUser.OpenSubKey(regPath))
 				{
 					if (key == null)
 					{
@@ -165,9 +170,9 @@ namespace VitaNex
 
 					string dir = null, file = null;
 
-					foreach (var pathStub in
-						KnownRegistryKeyValueNames.Select(knownKeyValueName => key.GetValue(knownKeyValueName) as string)
-												  .Where(pathStub => !String.IsNullOrWhiteSpace(pathStub)))
+					foreach (var pathStub in KnownRegistryKeyValueNames
+						.Select(knownKeyValueName => key.GetValue(knownKeyValueName) as string)
+						.Where(pathStub => !String.IsNullOrWhiteSpace(pathStub)))
 					{
 						if (String.IsNullOrWhiteSpace(file) && Path.HasExtension(pathStub))
 						{
@@ -189,7 +194,7 @@ namespace VitaNex
 							continue;
 						}
 
-						string fullPath = dir.Replace('/', '\\');
+						var fullPath = dir.Replace('/', '\\');
 
 						if (fullPath[fullPath.Length - 1] != '\\')
 						{
@@ -216,3 +221,5 @@ namespace VitaNex
 		}
 	}
 }
+
+#endif

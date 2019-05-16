@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -16,16 +16,9 @@ using Server;
 namespace VitaNex
 {
 	[PropertyObject]
-	public abstract class PropertyObject
+	public abstract class PropertyObject : IHued
 	{
-		public PropertyObject()
-		{ }
-
-		public PropertyObject(GenericReader reader)
-			: this()
-		{
-			Deserialize(reader);
-		}
+		int IHued.HuedItemID { get { return 2278; } }
 
 		[CommandProperty(AccessLevel.Administrator)]
 		public virtual bool InvokeClear
@@ -53,8 +46,31 @@ namespace VitaNex
 			}
 		}
 
-		public abstract void Clear();
-		public abstract void Reset();
+		public PropertyObject()
+		{ }
+
+		public PropertyObject(GenericReader reader)
+			: this(reader, false)
+		{ }
+
+		public PropertyObject(GenericReader reader, bool deferred)
+			: this()
+		{
+			if (deferred)
+			{
+				Timer.DelayCall(Deserialize, reader);
+			}
+			else
+			{
+				Deserialize(reader);
+			}
+		}
+
+		public virtual void Clear()
+		{ }
+
+		public virtual void Reset()
+		{ }
 
 		public virtual void Serialize(GenericWriter writer)
 		{

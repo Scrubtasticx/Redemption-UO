@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,7 +21,13 @@ namespace VitaNex.SuperGumps
 {
 	public abstract partial class SuperGump
 	{
-		public Dictionary<GumpTextEntryLimited, Action<GumpTextEntryLimited, string>> LimitedTextInputs { get; private set; }
+		private Dictionary<GumpTextEntryLimited, Action<GumpTextEntryLimited, string>> _LimitedTextInputs;
+
+		public Dictionary<GumpTextEntryLimited, Action<GumpTextEntryLimited, string>> LimitedTextInputs
+		{
+			get { return _LimitedTextInputs; }
+			protected set { _LimitedTextInputs = value; }
+		}
 
 		public Action<GumpTextEntryLimited, string> LimitedTextInputHandler { get; set; }
 
@@ -36,7 +42,14 @@ namespace VitaNex.SuperGumps
 		}
 
 		public void AddTextEntryLimited(
-			int x, int y, int width, int height, int hue, string text, int length, Action<GumpTextEntryLimited, string> handler)
+			int x,
+			int y,
+			int width,
+			int height,
+			int hue,
+			string text,
+			int length,
+			Action<GumpTextEntryLimited, string> handler)
 		{
 			AddTextEntryLimited(x, y, width, height, hue, NewTextEntryID(), text, length, handler);
 		}
@@ -67,14 +80,7 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			if (!LimitedTextInputs.ContainsKey(input))
-			{
-				LimitedTextInputs.Add(input, handler);
-			}
-			else
-			{
-				LimitedTextInputs[input] = handler;
-			}
+			LimitedTextInputs[input] = handler;
 
 			Add(input);
 		}
@@ -93,7 +99,7 @@ namespace VitaNex.SuperGumps
 
 		public virtual bool CanDisplay(GumpTextEntryLimited input)
 		{
-			return (input != null);
+			return input != null;
 		}
 
 		public GumpTextEntryLimited GetTextEntryLimited(int inputID)

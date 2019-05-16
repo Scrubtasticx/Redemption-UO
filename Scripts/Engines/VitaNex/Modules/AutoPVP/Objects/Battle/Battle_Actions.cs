@@ -3,13 +3,15 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
+using System;
+
 using Server;
 using Server.Items;
 using Server.Mobiles;
@@ -30,10 +32,10 @@ namespace VitaNex.Modules.AutoPvP
 				return;
 			}
 
-			Point3D oldLoc = m.Location;
-			Map oldMap = m.Map;
+			var oldLoc = m.Location;
+			var oldMap = m.Map;
 
-			PlayerMobile pm = m as PlayerMobile;
+			var pm = m as PlayerMobile;
 
 			if (pm != null && !IsOnline(pm))
 			{
@@ -42,7 +44,7 @@ namespace VitaNex.Modules.AutoPvP
 
 				if (!pm.Alive && pm.Corpse != null && !pm.Corpse.Deleted)
 				{
-					pm.Corpse.MoveToWorld(pm.LogoutLocation, pm.LogoutMap);
+					pm.Corpse.MoveToWorld(destLoc, destMap);
 				}
 
 				OnTeleported(pm, oldLoc, oldMap);
@@ -51,8 +53,9 @@ namespace VitaNex.Modules.AutoPvP
 
 			if (!m.Hidden)
 			{
-				Effects.SendLocationParticles(
-					EffectItem.Create(m.Location, m.Map, EffectItem.DefaultDuration), 0x3728, 10, 10, 5023);
+				var fx = EffectItem.Create(m.Location, m.Map, EffectItem.DefaultDuration);
+
+				Effects.SendLocationParticles(fx, 0x3728, 10, 10, 5023);
 			}
 
 			m.MoveToWorld(destLoc, destMap);
@@ -61,7 +64,9 @@ namespace VitaNex.Modules.AutoPvP
 
 			if (!m.Hidden)
 			{
-				Effects.SendLocationParticles(EffectItem.Create(destLoc, destMap, EffectItem.DefaultDuration), 0x3728, 10, 10, 5023);
+				var fx = EffectItem.Create(destLoc, destMap, EffectItem.DefaultDuration);
+
+				Effects.SendLocationParticles(fx, 0x3728, 10, 10, 5023);
 			}
 
 			if (m.Location != destLoc || m.Map != destMap)
@@ -96,7 +101,7 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void TeleportToHomeBase(PvPTeam team, PlayerMobile pm)
 		{
-			if (pm != null && !pm.Deleted && team != null && !team.Deleted && team.IsMember(pm))
+			if (pm != null && !pm.Deleted && team != null && !team.Deleted)
 			{
 				Teleport(pm, team.HomeBase, Options.Locations.Map);
 			}
@@ -104,20 +109,24 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void TeleportToSpawnPoint(PvPTeam team, PlayerMobile pm)
 		{
-			if (pm != null && !pm.Deleted && team != null && !team.Deleted && team.IsMember(pm))
+			if (pm == null || pm.Deleted || team == null || team.Deleted)
 			{
-				Teleport(pm, team.SpawnPoint, Options.Locations.Map);
+				return;
 			}
+
+			var p = team.SpawnPoint;
+
+			if (team.RespawnRangeMin > 0 && team.RespawnRangeMax > 0)
+			{
+				p = p.GetRandomPoint3D(team.RespawnRangeMin, team.RespawnRangeMax);
+			}
+
+			Teleport(pm, p, Options.Locations.Map);
 		}
 
 		protected virtual void OnTeleported(Mobile m, Point3D oldLocation, Map oldMap)
 		{
 			if (m == null || m.Deleted)
-			{
-				return;
-			}
-
-			if (State == PvPBattleState.Internal || Hidden)
 			{
 				return;
 			}
@@ -128,6 +137,9 @@ namespace VitaNex.Modules.AutoPvP
 			{
 				OnTeleported((PlayerMobile)m, oldLocation, oldMap);
 			}
+
+			m.Delta(MobileDelta.Noto);
+			m.ProcessDelta();
 		}
 
 		protected virtual void OnTeleported(PlayerMobile pm, Point3D oldLocation, Map oldMap)
@@ -137,14 +149,21 @@ namespace VitaNex.Modules.AutoPvP
 				return;
 			}
 
-			if (State == PvPBattleState.Internal || Hidden)
-			{
-				return;
-			}
+			var old = Region.Find(oldLocation, oldMap);
 
-			if ((pm.InRegion(BattleRegion) || pm.InRegion(SpectateRegion)) && (IsParticipant(pm) || IsSpectator(pm)))
+			if (!old.IsPartOf(BattleRegion))
 			{
-				Negate(pm);
+				if (pm.InRegion(BattleRegion))
+				{
+					Negate(pm);
+				}
+			}
+			else
+			{
+				if (!pm.InRegion(BattleRegion))
+				{
+					Negate(pm);
+				}
 			}
 		}
 
@@ -180,7 +199,12 @@ namespace VitaNex.Modules.AutoPvP
 				return false;
 			}
 
-			if (m.Mounted && m.Mount != null)
+			if (m.Flying && Options.Rules.CanFly)
+			{
+				return false;
+			}
+
+			if (m.Mounted)
 			{
 				if (m.Mount is EtherealMount && Options.Rules.CanMountEthereal)
 				{
@@ -199,23 +223,29 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void Dismount(Mobile m)
 		{
-			if (m == null || m.Deleted || !m.Mounted || m.Mount == null)
+			if (m == null || m.Deleted)
 			{
 				return;
 			}
 
-			IMount mount = m.Mount;
-
-			mount.Rider = null;
-
-			OnDismounted(m, mount);
+			if (m.Flying)
+			{
+				m.Flying = false;
+				OnDismounted(m, null);
+			}
+			else if (m.Mount != null)
+			{
+				var mount = m.Mount;
+				mount.Rider = null;
+				OnDismounted(m, mount);
+			}
 		}
 
 		public virtual void OnDismounted(Mobile m, IMount mount)
 		{
-			if (m != null && !m.Deleted && mount != null)
+			if (m != null && !m.Deleted)
 			{
-				m.SendMessage("You have been dismounted.");
+				m.SendMessage(mount != null ? "You have been dismounted." : "You have been wing clipped.");
 			}
 		}
 
@@ -390,10 +420,16 @@ namespace VitaNex.Modules.AutoPvP
 				return;
 			}
 
-			PlayerMobile pm = m as PlayerMobile;
+			var pm = m as PlayerMobile;
+
+			if (pm == null)
+			{
+				return;
+			}
+
 			PvPTeam team;
 
-			if (pm != null && IsParticipant(pm, out team) && team != null && !team.Deleted)
+			if (IsParticipant(pm, out team) && team != null && !team.Deleted)
 			{
 				team.OnMemberDeath(pm);
 			}
@@ -406,16 +442,19 @@ namespace VitaNex.Modules.AutoPvP
 				return;
 			}
 
-			PlayerMobile pm = m as PlayerMobile;
-			PvPTeam team;
+			var pm = m as PlayerMobile;
 
-			if (pm == null || !IsParticipant(pm, out team) || team == null || team.Deleted)
+			if (pm == null)
 			{
 				return;
 			}
 
-			pm.SendMessage("You have been spared death, this time...");
-			team.OnMemberDeath(pm);
+			PvPTeam team;
+
+			if (IsParticipant(pm, out team) && team != null && !team.Deleted)
+			{
+				team.OnMemberDeath(pm);
+			}
 		}
 
 		public virtual void OnDeath(Mobile m)
@@ -488,6 +527,16 @@ namespace VitaNex.Modules.AutoPvP
 				return true;
 			}
 
+			if (!Options.Rules.CanFly)
+			{
+				var t = spell.GetType();
+
+				if (t.Name.ContainsAny("FlySpell", "FlightSpell"))
+				{
+					return false;
+				}
+			}
+
 			return !Options.Restrictions.Spells.IsRestricted((Spell)spell);
 		}
 
@@ -502,19 +551,7 @@ namespace VitaNex.Modules.AutoPvP
 			}
 		}
 
-		public bool OnDamage(Mobile attacker, Mobile damaged, ref int damage)
-		{
-			if (CheckDamage(attacker, damaged, ref damage))
-			{
-				OnDamageAccept(attacker, damaged, ref damage);
-				return true;
-			}
-
-			OnDamageDeny(attacker, damaged, ref damage);
-			return false;
-		}
-
-		public virtual bool CheckDamage(Mobile attacker, Mobile damaged, ref int damage)
+		public virtual bool CheckDamage(Mobile damaged, ref int damage)
 		{
 			if (damaged == null || damaged.Deleted)
 			{
@@ -523,13 +560,13 @@ namespace VitaNex.Modules.AutoPvP
 
 			if (!DebugMode && damaged.AccessLevel >= AccessLevel.Counselor)
 			{
-				return true;
+				return false;
 			}
 
 			return Options.Rules.CanBeDamaged;
 		}
 
-		protected virtual void OnDamageAccept(Mobile attacker, Mobile damaged, ref int damage)
+		public virtual void OnDamage(Mobile damager, Mobile damaged, int damage)
 		{
 			if (damage <= 0)
 			{
@@ -537,56 +574,34 @@ namespace VitaNex.Modules.AutoPvP
 			}
 
 			PlayerMobile pm;
+			PvPTeam t;
 
-			if (attacker != null && !attacker.Deleted && attacker is PlayerMobile)
+			if (damager != null && !damager.Deleted && damager is PlayerMobile)
 			{
-				pm = (PlayerMobile)attacker;
+				pm = (PlayerMobile)damager;
 
-				if (IsParticipant(pm))
+				if (IsParticipant(pm, out t))
 				{
-					EnsureStatistics(pm).DamageDone += damage;
+					var d = damage;
+
+					UpdateStatistics(t, pm, o => o.DamageDone += d);
 				}
 			}
 
-			if (damaged == null || damaged.Deleted || !(damaged is PlayerMobile))
+			if (damaged != null && !damaged.Deleted && damaged is PlayerMobile)
 			{
-				return;
-			}
+				pm = (PlayerMobile)damaged;
 
-			pm = (PlayerMobile)damaged;
+				if (IsParticipant(pm, out t))
+				{
+					var d = damage;
 
-			if (IsParticipant(pm))
-			{
-				EnsureStatistics(pm).DamageTaken += damage;
-			}
-		}
-
-		public virtual void OnDamageDeny(Mobile attacker, Mobile damaged, ref int damage)
-		{
-			if (damaged != null && !damaged.Deleted && damage > 0)
-			{
-				damaged.SendMessage("You have been spared damage, this time...");
+					UpdateStatistics(t, pm, o => o.DamageTaken += d);
+				}
 			}
 		}
 
-		public bool OnHeal(Mobile healer, Mobile healed, ref int heal)
-		{
-			if (CheckHeal(healer, healed, ref heal))
-			{
-				OnHealAccept(healer, healed, ref heal);
-				return true;
-			}
-
-			OnHealDeny(healer, healed, ref heal);
-			return false;
-		}
-
-		/// <summary>
-		/// </summary>
-		/// <param name="healer">CONSTANT NULL</param>
-		/// <param name="healed"></param>
-		/// <param name="heal"></param>
-		public virtual bool CheckHeal(Mobile healer, Mobile healed, ref int heal)
+		public virtual bool CheckHeal(Mobile healed, ref int heal)
 		{
 			if (healed == null || healed.Deleted)
 			{
@@ -601,12 +616,7 @@ namespace VitaNex.Modules.AutoPvP
 			return Options.Rules.CanHeal;
 		}
 
-		/// <summary>
-		/// </summary>
-		/// <param name="healer">CONSTANT NULL</param>
-		/// <param name="healed"></param>
-		/// <param name="heal"></param>
-		protected virtual void OnHealAccept(Mobile healer, Mobile healed, ref int heal)
+		public virtual void OnHeal(Mobile healer, Mobile healed, int heal)
 		{
 			if (heal <= 0)
 			{
@@ -614,40 +624,30 @@ namespace VitaNex.Modules.AutoPvP
 			}
 
 			PlayerMobile pm;
+			PvPTeam t;
 
 			if (healer != null && !healer.Deleted && healer is PlayerMobile)
 			{
 				pm = (PlayerMobile)healer;
 
-				if (IsParticipant(pm))
+				if (IsParticipant(pm, out t))
 				{
-					EnsureStatistics(pm).HealingDone += heal;
+					var h = heal;
+
+					UpdateStatistics(t, pm, o => o.HealingDone += h);
 				}
 			}
 
-			if (healed == null || healed.Deleted || !(healed is PlayerMobile))
+			if (healed != null && !healed.Deleted && healed is PlayerMobile)
 			{
-				return;
-			}
+				pm = (PlayerMobile)healed;
 
-			pm = (PlayerMobile)healed;
+				if (IsParticipant(pm, out t))
+				{
+					var h = heal;
 
-			if (IsParticipant(pm))
-			{
-				EnsureStatistics(pm).HealingTaken += heal;
-			}
-		}
-
-		/// <summary>
-		/// </summary>
-		/// <param name="healer">CONSTANT NULL</param>
-		/// <param name="healed"></param>
-		/// <param name="heal"></param>
-		protected virtual void OnHealDeny(Mobile healer, Mobile healed, ref int heal)
-		{
-			if (healed != null && !healed.Deleted && heal > 0)
-			{
-				healed.SendMessage("You can not be healed at this time.");
+					UpdateStatistics(t, pm, o => o.HealingTaken += h);
+				}
 			}
 		}
 
@@ -680,12 +680,18 @@ namespace VitaNex.Modules.AutoPvP
 
 		protected virtual void OnResurrectAccept(Mobile m)
 		{
-			if (m == null || m.Deleted || !(m is PlayerMobile))
+			if (m == null || m.Deleted)
 			{
 				return;
 			}
 
-			PlayerMobile pm = (PlayerMobile)m;
+			var pm = m as PlayerMobile;
+
+			if (pm == null)
+			{
+				return;
+			}
+
 			PvPTeam team;
 
 			if (IsParticipant(pm, out team) && team != null && !team.Deleted)
@@ -706,7 +712,7 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			if (args.Mobile is PlayerMobile)
 			{
-				PlayerMobile pm = (PlayerMobile)args.Mobile;
+				var pm = (PlayerMobile)args.Mobile;
 
 				if (HandleSubCommand(pm, args.Speech))
 				{
@@ -776,16 +782,6 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual bool OnDoubleClick(Mobile m, object o)
 		{
-			if (m == null || m.Deleted || o == null)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
 			if (o is Item)
 			{
 				return OnDoubleClick(m, (Item)o);
@@ -796,98 +792,31 @@ namespace VitaNex.Modules.AutoPvP
 				return OnDoubleClick(m, (Mobile)o);
 			}
 
-			return true;
+			return m != null && !m.Deleted && o != null;
 		}
 
 		public virtual bool OnDoubleClick(Mobile m, Item item)
 		{
-			if (m == null || m.Deleted || item == null || item.Deleted)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
-			if (item is EtherealMount && !Options.Rules.CanMountEthereal)
-			{
-				m.SendMessage("You are not allowed to ride a mount in this battle.");
-				return false;
-			}
-
-			if (Options.Restrictions.Items.IsRestricted(item))
-			{
-				m.SendMessage("You can not use that in this battle.");
-				return false;
-			}
-
-			return true;
+			return m != null && !m.Deleted && item != null && !item.Deleted && CanUseItem(m, item, true);
 		}
 
 		public virtual bool OnDoubleClick(Mobile m, Mobile target)
 		{
-			if (m == null || m.Deleted || target == null || target.Deleted)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
 			if (target is BaseCreature)
 			{
 				return OnDoubleClick(m, (BaseCreature)target);
 			}
 
-			return true;
+			return m != null && !m.Deleted && target != null && !target.Deleted && CanUseMobile(m, target, true);
 		}
 
 		public virtual bool OnDoubleClick(Mobile m, BaseCreature target)
 		{
-			if (m == null || m.Deleted || target == null || target.Deleted)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
-			if (target.GetMaster() == m)
-			{
-				if (target is BaseMount && !Options.Rules.CanMount)
-				{
-					m.SendMessage("You are not allowed to ride a mount in this battle.");
-					return false;
-				}
-
-				if (Options.Restrictions.Pets.IsRestricted(target))
-				{
-					m.SendMessage("You can not use that in this battle.");
-					return false;
-				}
-			}
-
-			return true;
+			return m != null && !m.Deleted && target != null && !target.Deleted && CanUseMobile(m, target, true);
 		}
 
 		public virtual bool OnSingleClick(Mobile m, object o)
 		{
-			if (m == null || m.Deleted || o == null)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
 			if (o is Item)
 			{
 				return OnSingleClick(m, (Item)o);
@@ -898,62 +827,27 @@ namespace VitaNex.Modules.AutoPvP
 				return OnSingleClick(m, (Mobile)o);
 			}
 
-			return true;
+			return m != null && !m.Deleted && o != null;
 		}
 
 		public virtual bool OnSingleClick(Mobile m, Item item)
 		{
-			if (m == null || m.Deleted || item == null || item.Deleted)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
-			return !Options.Restrictions.Items.IsRestricted(item);
+			return m != null && !m.Deleted && item != null && !item.Deleted && CanUseItem(m, item, false);
 		}
 
 		public virtual bool OnSingleClick(Mobile m, Mobile target)
 		{
-			if (m == null || m.Deleted || target == null || target.Deleted)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
 			if (target is BaseCreature)
 			{
 				return OnSingleClick(m, (BaseCreature)target);
 			}
 
-			return true;
+			return m != null && !m.Deleted && target != null && !target.Deleted && CanUseMobile(m, target, false);
 		}
 
 		public virtual bool OnSingleClick(Mobile m, BaseCreature target)
 		{
-			if (m == null || m.Deleted || target == null || target.Deleted)
-			{
-				return false;
-			}
-
-			if ((!DebugMode && m.AccessLevel >= AccessLevel.Counselor) || State == PvPBattleState.Internal || Hidden)
-			{
-				return true;
-			}
-
-			if (target is BaseMount && target.GetMaster() == m && Options.Restrictions.Pets.IsRestricted(target))
-			{
-				return false;
-			}
-
-			return true;
+			return m != null && !m.Deleted && target != null && !target.Deleted && CanUseMobile(m, target, false);
 		}
 
 		public virtual void OnGotBeneficialAction(Mobile helper, Mobile target)

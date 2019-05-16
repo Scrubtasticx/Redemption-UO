@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,7 +12,6 @@
 #region References
 using System;
 using System.Drawing;
-using System.Reflection;
 
 using Server.Gumps;
 #endregion
@@ -21,7 +20,9 @@ namespace VitaNex.SuperGumps
 {
 	public abstract partial class SuperGump
 	{
-		private Size _InternalSize = new Size(0, 0);
+		private SuperGumpLayout _Layout;
+
+		public SuperGumpLayout Layout { get { return _Layout; } protected set { _Layout = value; } }
 
 		public virtual bool CanMove { get { return Dragable; } set { Dragable = value; } }
 		public virtual bool CanClose { get { return Closable; } set { Closable = value; } }
@@ -33,101 +34,76 @@ namespace VitaNex.SuperGumps
 		public virtual int XOffset { get; set; }
 		public virtual int YOffset { get; set; }
 
-		public Size OuterSize { get { return _InternalSize; } }
+		private long _SizeTick = -1;
+		private Size _Size = Size.Empty;
 
-		public int OuterWidth { get { return _InternalSize.Width; } }
-		public int OuterHeight { get { return _InternalSize.Height; } }
+		public Size OuterSize
+		{
+			get
+			{
+				lock (_InstanceLock)
+				{
+					// Prevent computing size if called successive times on the same tick
+					var tick = VitaNexCore.Tick;
+
+					if (tick == _SizeTick)
+					{
+						return _Size;
+					}
+
+					_SizeTick = tick;
+
+					int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+
+					foreach (var e in Entries.Not(e => e is GumpModal))
+					{
+						int ex, ey, ew, eh;
+
+						if (!e.TryGetBounds(out ex, out ey, out ew, out eh))
+						{
+							continue;
+						}
+
+						x1 = Math.Min(x1, ex);
+						y1 = Math.Min(y1, ey);
+
+						x2 = Math.Max(x2, ex + ew);
+						y2 = Math.Max(y2, ey + eh);
+					}
+
+					_Size.Width = Math.Max(0, x2 - x1);
+					_Size.Height = Math.Max(0, y2 - y1);
+
+					return _Size;
+				}
+			}
+		}
+
+		public int OuterWidth { get { return OuterSize.Width; } }
+		public int OuterHeight { get { return OuterSize.Height; } }
 
 		public void InvalidateSize()
 		{
-			Entries.ForEach(
-				entry =>
-				{
-					Type eType = entry.GetType();
-					PropertyInfo xProp = eType.GetProperty("X", typeof(int)),
-								 yProp = eType.GetProperty("Y", typeof(int)),
-								 wProp = eType.GetProperty("Width", typeof(int)),
-								 hProp = eType.GetProperty("Height", typeof(int));
-
-					int x = 0, y = 0, w = 0, h = 0;
-
-					if (xProp != null)
-					{
-						x = (int)xProp.GetValue(entry, null);
-					}
-
-					if (yProp != null)
-					{
-						y = (int)yProp.GetValue(entry, null);
-					}
-
-					if (wProp != null)
-					{
-						w = (int)wProp.GetValue(entry, null);
-					}
-
-					if (hProp != null)
-					{
-						h = (int)hProp.GetValue(entry, null);
-					}
-
-					_InternalSize.Width = Math.Max(_InternalSize.Width, x + w);
-					_InternalSize.Height = Math.Max(_InternalSize.Height, y + h);
-				});
+			_SizeTick = -1;
 		}
 
 		private void InvalidateOffsets()
 		{
-			Entries.For(
-				(i, entry) =>
+			Entries.ForEachReverse(
+				e =>
 				{
-					if (Modal)
+					var x = XOffset;
+					var y = YOffset;
+
+					if (Modal && (!(e is SuperGumpEntry) || !((SuperGumpEntry)e).IgnoreModalOffset))
 					{
-						if (entry is GumpBackground)
-						{
-							var e = (GumpBackground)entry;
-
-							if ((e.X == 0 || (e.X % 1024) == 0) && (e.Y == 0 || (e.Y % 786) == 0) && e.Width == 1024 && e.Height == 786)
-							{
-								return;
-							}
-						}
-
-						if (entry is GumpImageTiled)
-						{
-							var e = (GumpImageTiled)entry;
-
-							if ((e.X == 0 || (e.X % 1024) == 0) && (e.Y == 0 || (e.Y % 786) == 0) && e.Width == 1024 && e.Height == 786)
-							{
-								return;
-							}
-						}
-
-						if (entry is GumpAlphaRegion)
-						{
-							var e = (GumpAlphaRegion)entry;
-
-							if ((e.X == 0 || (e.X % 1024) == 0) && (e.Y == 0 || (e.Y % 786) == 0) && e.Width == 1024 && e.Height == 786)
-							{
-								return;
-							}
-						}
+						x += ModalXOffset;
+						y += ModalYOffset;
 					}
 
-					Type entryType = entry.GetType();
-
-					PropertyInfo xProp = entryType.GetProperty("X", typeof(int)), yProp = entryType.GetProperty("Y", typeof(int));
-
-					if (xProp != null)
+					if (x != 0 || y != 0)
 					{
-						var x = (int)xProp.GetValue(entry, null);
-						xProp.SetValue(entry, x + (ModalXOffset + XOffset), null);
-					}
-
-					if (yProp != null)
-					{
-						var y = (int)yProp.GetValue(entry, null);
-						yProp.SetValue(entry, y + (ModalYOffset + YOffset), null);
+						e.TryOffsetPosition(x, y);
 					}
 				});
 		}

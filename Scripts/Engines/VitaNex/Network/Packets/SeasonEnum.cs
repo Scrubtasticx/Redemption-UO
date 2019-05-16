@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -13,12 +13,35 @@ namespace VitaNex.Network
 {
 	public enum Season
 	{
+		/// <summary>
+		///     Spring: 0
+		/// </summary>
 		Spring = 0,
+
+		/// <summary>
+		///     Summer: 1
+		/// </summary>
 		Summer = 1,
+
+		/// <summary>
+		///     Autumn: 2
+		/// </summary>
 		Autumn = 2,
+
+		/// <summary>
+		///     Winter: 3
+		/// </summary>
 		Winter = 3,
+
+		/// <summary>
+		///     Desolation: 4
+		/// </summary>
 		Desolation = 4,
-		Fall = Autumn,
+
+		/// <summary>
+		///     Fall: 2
+		/// </summary>
+		Fall = Autumn
 	}
 
 	public static class SeasonEnumExt

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -18,38 +18,25 @@ namespace VitaNex.SuperGumps
 {
 	public abstract partial class SuperGump
 	{
-		public List<SuperGump> Children { get; private set; }
+		private List<SuperGump> _Children;
 
-		public bool HasChildren { get { return (Children != null && Children.Count > 0); } }
+		public List<SuperGump> Children { get { return _Children; } protected set { _Children = value; } }
+
+		public bool HasChildren { get { return Children.Count > 0; } }
+		public bool HasOpenChildren { get { return Children.Any(o => o.IsOpen); } }
 
 		protected void AddChild(SuperGump child)
 		{
-			if (child == null)
+			if (child != null && !Children.Contains(child))
 			{
-				return;
+				Children.Add(child);
+				OnChildAdded(child);
 			}
-
-			//child._Parent = this;
-
-			if (Children.Contains(child))
-			{
-				return;
-			}
-
-			Children.Add(child);
-			OnChildAdded(child);
 		}
 
 		protected void RemoveChild(SuperGump child)
 		{
-			if (child == null)
-			{
-				return;
-			}
-
-			//child._Parent = null;
-
-			if (Children.Remove(child))
+			if (child != null && Children.Remove(child))
 			{
 				OnChildRemoved(child);
 			}

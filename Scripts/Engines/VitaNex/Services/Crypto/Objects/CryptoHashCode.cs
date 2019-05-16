@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -13,97 +13,41 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
+using System.Text;
 
 using Server;
 #endregion
 
 namespace VitaNex.Crypto
 {
-	public class CryptoHashCode : IEquatable<CryptoHashCode>, IComparable<CryptoHashCode>, IEnumerable<char>
+	public class CryptoHashCode : IEquatable<CryptoHashCode>, IComparable<CryptoHashCode>, IEnumerable<char>, IDisposable
 	{
-		private int _ProviderID;
-		private string _Seed;
-		private string _Value;
-
-		public virtual string Seed
-		{
-			get { return _Seed; }
-			protected set
-			{
-				if (_Seed == value)
-				{
-					return;
-				}
-
-				_Seed = value;
-				_Value = CryptoGenerator.GenString(_ProviderID, _Seed);
-			}
-		}
-
-		public virtual int ProviderID
-		{
-			get { return _ProviderID; }
-			protected set
-			{
-				if (_ProviderID == value || value < 0)
-				{
-					return;
-				}
-
-				_ProviderID = value;
-				_Value = CryptoGenerator.GenString(_ProviderID, _Seed);
-			}
-		}
-
-		public virtual string Value
-		{
-			//
-			get { return _Value = String.IsNullOrWhiteSpace(_Value) ? CryptoGenerator.GenString(_ProviderID, _Seed) : _Value; }
-		}
+		private int _ValueHash = -1;
 
 		public int ValueHash { get { return GetValueHash(); } }
 
-		public int GetValueHash()
-		{
-			unchecked
-			{
-				// I know, this is super lazy...
+		public bool IsDisposed { get; private set; }
 
-				// Get all bytes in the hashcode as UInt64
-				var alpha = _Value.Split('-').Select(b => Byte.Parse(b, NumberStyles.HexNumber)).ToArray();
+		public bool IsExtended { get { return CryptoService.IsExtended(ProviderID); } }
 
-				// XOR them all together using the length of alpha as the seed, producing 8 bytes
-				// Each iteration multiplies the current value by ReSharper's golden number 397.
-				var delta = BitConverter.GetBytes(alpha.Aggregate(alpha.LongLength, (l, r) => (l * 397) ^ r));
+		public int ProviderID { get; protected set; }
 
-				// Fold the first 4 bytes with the second 4 bytes to produce the hash
-				int hash = BitConverter.ToInt32(delta, 0) ^ BitConverter.ToInt32(delta, 3);
+		public virtual string Value { get; private set; }
 
-				// It may be negative, so ensure it is positive, normally this wouldn't be the case but negatives integers for 
-				// almost unique id's should be positive for things like database keys.
-				return Math.Abs(hash);
-			}
-		}
+		public int Length { get { return Value.Length; } }
 
-		public bool IsExtended { get { return CryptoService.IsExtended(_ProviderID); } }
-
-		public virtual int Length { get { return Value.Length; } }
-		public virtual char this[int index] { get { return Value[index]; } }
+		public char this[int index] { get { return Value[index]; } }
 
 		public CryptoHashCode(CryptoHashType type, string seed)
-		{
-			_Seed = seed;
-			_ProviderID = (int)type;
-			_Value = CryptoGenerator.GenString(type, _Seed);
-		}
+			: this((int)type, seed)
+		{ }
 
 		public CryptoHashCode(int providerID, string seed)
 		{
-			_Seed = seed;
-			_ProviderID = providerID;
-			_Value = CryptoGenerator.GenString(_ProviderID, _Seed);
+			ProviderID = providerID;
+
+			Value = CryptoGenerator.GenString(ProviderID, seed ?? String.Empty);
 		}
 
 		public CryptoHashCode(GenericReader reader)
@@ -111,9 +55,14 @@ namespace VitaNex.Crypto
 			Deserialize(reader);
 		}
 
-		public virtual int CompareTo(CryptoHashCode code)
+		~CryptoHashCode()
 		{
-			return code == null ? -1 : String.Compare(Value, code.Value, StringComparison.Ordinal);
+			Dispose();
+		}
+
+		public override string ToString()
+		{
+			return Value;
 		}
 
 		IEnumerator IEnumerable.GetEnumerator()
@@ -121,40 +70,14 @@ namespace VitaNex.Crypto
 			return GetEnumerator();
 		}
 
-		public virtual IEnumerator<char> GetEnumerator()
+		public IEnumerator<char> GetEnumerator()
 		{
 			return Value.GetEnumerator();
 		}
 
-		public virtual void Serialize(GenericWriter writer)
+		public virtual int CompareTo(CryptoHashCode code)
 		{
-			int version = writer.SetVersion(0);
-
-			switch (version)
-			{
-				case 0:
-					{
-						writer.Write(_ProviderID);
-						writer.Write(_Seed);
-					}
-					break;
-			}
-		}
-
-		public virtual void Deserialize(GenericReader reader)
-		{
-			int version = reader.ReadInt();
-
-			switch (version)
-			{
-				case 0:
-					{
-						_ProviderID = reader.ReadInt();
-						_Seed = reader.ReadString();
-						_Value = CryptoGenerator.GenString(_ProviderID, _Seed);
-					}
-					break;
-			}
+			return !ReferenceEquals(code, null) ? Insensitive.Compare(Value, code.Value) : -1;
 		}
 
 		public override bool Equals(object obj)
@@ -164,32 +87,105 @@ namespace VitaNex.Crypto
 
 		public bool Equals(CryptoHashCode other)
 		{
-			return !ReferenceEquals(null, other) && (ReferenceEquals(this, other) || String.Equals(Value, other.Value));
+			return !ReferenceEquals(other, null) && ValueHash == other.ValueHash;
 		}
 
 		public override int GetHashCode()
 		{
-			unchecked
+			return unchecked(((ProviderID + 1) * 397) ^ ValueHash);
+		}
+
+		public int GetValueHash()
+		{
+			if (_ValueHash > -1)
 			{
-				int hash = _ProviderID;
-				hash = (hash * 397) ^ (_Value != null ? _Value.GetHashCode() : 0);
-				return hash;
+				return _ValueHash;
+			}
+
+			var hash = Value.Aggregate(Value.Length, (h, c) => unchecked((h * 397) ^ (int)c));
+
+			// It may be negative, so ensure it is positive, normally this wouldn't be the case but negative integers for 
+			// almost unique id's should be positive for things like database keys.
+			// Note this increases chance of unique collisions by 50%, though still extremely unlikely;
+			// 1 : 2,147,483,647
+			return _ValueHash = Math.Abs(hash);
+		}
+
+		public virtual void Dispose()
+		{
+			if (IsDisposed)
+			{
+				return;
+			}
+
+			IsDisposed = true;
+
+			GC.SuppressFinalize(this);
+
+			Value = null;
+		}
+
+		public virtual void Serialize(GenericWriter writer)
+		{
+			var version = writer.SetVersion(2);
+
+			writer.Write(ProviderID);
+
+			switch (version)
+			{
+				case 2:
+				{
+					writer.Write(Value);
+					writer.Write(_ValueHash);
+				}
+					break;
+				case 1:
+				case 0:
+					break;
 			}
 		}
 
-		public override string ToString()
+		public virtual void Deserialize(GenericReader reader)
 		{
-			return Value;
+			var version = reader.GetVersion();
+
+			ProviderID = reader.ReadInt();
+
+			switch (version)
+			{
+				case 2:
+				{
+					Value = reader.ReadString();
+					_ValueHash = reader.ReadInt();
+				}
+					break;
+				case 1:
+				{
+					var seed = reader.ReadBool()
+						? StringCompression.Unpack(reader.ReadBytes())
+						: Encoding.UTF32.GetString(reader.ReadBytes());
+
+					Value = CryptoGenerator.GenString(ProviderID, seed ?? String.Empty);
+				}
+					break;
+				case 0:
+				{
+					var seed = reader.ReadString();
+
+					Value = CryptoGenerator.GenString(ProviderID, seed ?? String.Empty);
+				}
+					break;
+			}
 		}
 
-		public static bool operator ==(CryptoHashCode left, CryptoHashCode right)
+		public static bool operator ==(CryptoHashCode l, CryptoHashCode r)
 		{
-			return ReferenceEquals(null, left) ? ReferenceEquals(null, right) : left.Equals(right);
+			return ReferenceEquals(l, null) ? ReferenceEquals(r, null) : l.Equals(r);
 		}
 
-		public static bool operator !=(CryptoHashCode left, CryptoHashCode right)
+		public static bool operator !=(CryptoHashCode l, CryptoHashCode r)
 		{
-			return ReferenceEquals(null, left) ? !ReferenceEquals(null, right) : !left.Equals(right);
+			return ReferenceEquals(l, null) ? !ReferenceEquals(r, null) : !l.Equals(r);
 		}
 	}
 }

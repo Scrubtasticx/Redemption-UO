@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -22,7 +22,7 @@ namespace VitaNex.Schedules
 	{
 		public const AccessLevel Access = AccessLevel.Administrator;
 
-		public static Dictionary<string, Schedule> Registry { get; private set; }
+		public static List<Schedule> Registry { get; private set; }
 
 		public static Schedule CreateSchedule(
 			string name,
@@ -37,7 +37,11 @@ namespace VitaNex.Schedules
 		}
 
 		public static Schedule CreateSchedule(
-			string name, bool enabled = true, bool register = true, ScheduleInfo info = null, Action<Schedule> handler = null)
+			string name,
+			bool enabled = true,
+			bool register = true,
+			ScheduleInfo info = null,
+			Action<Schedule> handler = null)
 		{
 			return CreateSchedule<Schedule>(name, enabled, register, info, handler);
 		}
@@ -49,13 +53,18 @@ namespace VitaNex.Schedules
 			ScheduleMonths months = ScheduleMonths.None,
 			ScheduleDays days = ScheduleDays.None,
 			ScheduleTimes times = null,
-			Action<Schedule> handler = null) where TSchedule : Schedule
+			Action<Schedule> handler = null)
+			where TSchedule : Schedule
 		{
 			return CreateSchedule<TSchedule>(name, enabled, register, new ScheduleInfo(months, days, times), handler);
 		}
 
 		public static TSchedule CreateSchedule<TSchedule>(
-			string name, bool enabled = true, bool register = true, ScheduleInfo info = null, Action<Schedule> handler = null)
+			string name,
+			bool enabled = true,
+			bool register = true,
+			ScheduleInfo info = null,
+			Action<Schedule> handler = null)
 			where TSchedule : Schedule
 		{
 			var st = VitaNexCore.TryCatchGet(() => typeof(TSchedule).CreateInstance<TSchedule>(name, enabled, info, handler));
@@ -70,28 +79,23 @@ namespace VitaNex.Schedules
 
 		public static bool IsRegistered(Schedule schedule)
 		{
-			return Registry.ContainsValue(schedule);
+			return schedule != null && Registry.Contains(schedule);
 		}
 
-		public static void Register(Schedule schedule, bool replace = true)
+		public static void Register(Schedule schedule)
 		{
-			string key = schedule.Name;
-
-			Registry.AddOrReplace(key, schedule);
+			if (schedule != null)
+			{
+				Registry.AddOrReplace(schedule);
+			}
 		}
 
 		public static void Unregister(Schedule schedule)
 		{
-			if (schedule == null)
+			if (schedule != null)
 			{
-				return;
+				Registry.Remove(schedule);
 			}
-
-			string key = schedule.Name;
-
-			schedule.Stop();
-
-			Registry.Remove(key);
 		}
 
 		public static ScheduleDays ConvertDay(int day)
@@ -235,23 +239,6 @@ namespace VitaNex.Schedules
 			}
 
 			return 0;
-		}
-
-		public static string FormatDate(DateTime dt)
-		{
-			return String.Format("{0}, {1} {2} {3}", dt.DayOfWeek, ConvertMonth(dt.Month), dt.Day, dt.Year);
-		}
-
-		public static string FormatTime(TimeSpan ts, bool ampm = false)
-		{
-			string format = String.Format("{0:D2}:{1:D2}", ts.Hours, ts.Minutes);
-
-			if (ampm)
-			{
-				format += (ts.Hours < 12) ? " AM" : " PM";
-			}
-
-			return format;
 		}
 	}
 }

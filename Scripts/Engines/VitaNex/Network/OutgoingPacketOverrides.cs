@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,12 +21,13 @@ using Server.Network;
 namespace VitaNex.Network
 {
 	public delegate void OutgoingPacketOverrideHandler(
-		NetState to, PacketReader reader, ref byte[] packetBuffer, ref int packetLength);
+		NetState to,
+		PacketReader reader,
+		ref byte[] packetBuffer,
+		ref int packetLength);
 
 	public static class OutgoingPacketOverrides
 	{
-		private static NetStateCreatedCallback _CreatedCallbackSuccessor;
-
 		private static readonly OutgoingPacketOverrideHandler[] _Handlers;
 		private static readonly OutgoingPacketOverrideHandler[] _ExtendedHandlersLow;
 		private static readonly Dictionary<int, OutgoingPacketOverrideHandler> _ExtendedHandlersHigh;
@@ -47,8 +48,7 @@ namespace VitaNex.Network
 				return;
 			}
 
-			_CreatedCallbackSuccessor = NetState.CreatedCallback;
-			NetState.CreatedCallback = OnNetStateCreated;
+			NetState.CreatedCallback += OnNetStateCreated;
 
 			Initialized = true;
 		}
@@ -56,14 +56,9 @@ namespace VitaNex.Network
 		private static void OnNetStateCreated(NetState n)
 		{
 			n.PacketEncoder = new PacketOverrideRegistryEncoder(n.PacketEncoder);
-
-			if (_CreatedCallbackSuccessor != null)
-			{
-				_CreatedCallbackSuccessor(n);
-			}
 		}
 
-		public static void Register(int packetID, bool compressed, OutgoingPacketOverrideHandler handler)
+		public static void Register(int packetID, OutgoingPacketOverrideHandler handler)
 		{
 			_Handlers[packetID] = handler;
 		}
@@ -133,7 +128,7 @@ namespace VitaNex.Network
 					packetId = packetBuffer[0];
 				}
 
-				OutgoingPacketOverrideHandler oHandler = GetHandler(packetId) ?? GetExtendedHandler(packetId);
+				var oHandler = GetHandler(packetId) ?? GetExtendedHandler(packetId);
 
 				if (oHandler != null)
 				{

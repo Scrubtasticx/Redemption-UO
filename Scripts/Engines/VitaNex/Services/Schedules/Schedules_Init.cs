@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -11,36 +11,21 @@
 
 #region References
 using System.Collections.Generic;
-
-using Server.Mobiles;
-
-using VitaNex.SuperGumps;
 #endregion
 
 namespace VitaNex.Schedules
 {
-	[CoreService("Schedules", "1.0.0.0", TaskPriority.High)]
+	[CoreService("Schedules", "3.0.0.0", TaskPriority.High)]
 	public static partial class Schedules
 	{
 		static Schedules()
 		{
-			Registry = new Dictionary<string, Schedule>();
-
-			ScheduleTimes.Config();
+			Registry = new List<Schedule>();
 		}
 
 		private static void CSConfig()
 		{
-			CommandUtility.Register(
-				"Schedules",
-				Access,
-				e =>
-				{
-					if (e != null && e.Mobile != null && !e.Mobile.Deleted && e.Mobile is PlayerMobile)
-					{
-						SuperGump.Send(new ScheduleListGump((PlayerMobile)e.Mobile));
-					}
-				});
+			CommandUtility.Register("Schedules", Access, e => new ScheduleListGump(e.Mobile).Send());
 		}
 	}
 }

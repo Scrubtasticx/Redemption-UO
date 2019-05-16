@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,92 +21,57 @@ using VitaNex.Network;
 
 namespace VitaNex.Modules.EquipmentSets
 {
-	public class EquipmentSetPart : PropertyObject
+	public class EquipmentSetPart
 	{
-		private bool _IncludeChildTypes;
+		private static readonly Item[] _EmptyItems = new Item[0];
 
 		private readonly List<Mobile> _EquipOwners = new List<Mobile>();
 
 		public List<Mobile> EquipOwners { get { return _EquipOwners; } }
 
-		[CommandProperty(EquipmentSets.Access)]
 		public string Name { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
-		public ItemTypeSelectProperty TypeOf { get; set; }
+		public Type[] Types { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
-		public bool IncludeChildTypes
-		{
-			get
-			{
-				if (_IncludeChildTypes && (TypeOf == null || !TypeOf.IsNotNull || TypeOf.InternalType.IsSealed))
-				{
-					_IncludeChildTypes = false;
-				}
+		public bool IncludeChildTypes { get; set; }
 
-				return _IncludeChildTypes;
-			}
-			set
-			{
-				if (value && (TypeOf == null || !TypeOf.IsNotNull || TypeOf.InternalType.IsSealed))
-				{
-					value = false;
-				}
-
-				_IncludeChildTypes = value;
-			}
-		}
-
-		[CommandProperty(EquipmentSets.Access)]
 		public bool Display { get; set; }
-
-		[CommandProperty(EquipmentSets.Access)]
 		public bool DisplaySet { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
-		public bool Valid { get { return Validate(); } }
+		public EquipmentSetPart(string name, Type type)
+			: this(name, new[] {type})
+		{ }
 
-		public EquipmentSetPart(
-			string name, Type typeOf, bool childTypes = false, bool display = true, bool displaySet = true)
+		public EquipmentSetPart(string name, Type type, bool childTypes)
+			: this(name, new[] {type}, childTypes)
+		{ }
+
+		public EquipmentSetPart(string name, Type type, bool childTypes, bool display, bool displaySet)
+			: this(name, new[] {type}, childTypes, display, displaySet)
+		{ }
+
+		public EquipmentSetPart(string name, params Type[] types)
+			: this(name, types, false)
+		{ }
+
+		public EquipmentSetPart(string name, Type[] types, bool childTypes)
+			: this(name, types, childTypes, true, true)
+		{ }
+
+		public EquipmentSetPart(string name, Type[] types, bool childTypes, bool display, bool displaySet)
 		{
 			Name = name;
-			TypeOf = typeOf;
+			Types = types;
+
 			IncludeChildTypes = childTypes;
+
 			Display = display;
 			DisplaySet = displaySet;
 		}
 
-		public EquipmentSetPart(GenericReader reader)
-			: base(reader)
-		{ }
-
-		public override void Clear()
-		{ }
-
-		public override void Reset()
-		{ }
-
-		public virtual bool Validate()
-		{
-			if (TypeOf == null || String.IsNullOrWhiteSpace(Name))
-			{
-				return false;
-			}
-
-			if (_IncludeChildTypes && (TypeOf == null || !TypeOf.IsNotNull || TypeOf.InternalType.IsSealed))
-			{
-				_IncludeChildTypes = false;
-			}
-
-			return true;
-		}
-
 		public bool IsTypeOf(Type type)
 		{
-			return type != null && TypeOf != null && TypeOf.IsNotNull && _IncludeChildTypes
-					   ? type.IsEqualOrChildOf(TypeOf)
-					   : type.IsEqual(TypeOf);
+			return type != null && Types != null && Types.Any(t => type.TypeEquals(t, IncludeChildTypes));
 		}
 
 		public bool IsEquipped(Mobile m)
@@ -124,15 +89,11 @@ namespace VitaNex.Modules.EquipmentSets
 				return false;
 			}
 
-			item = m.Items.FirstOrDefault(i => IsTypeOf(i.GetType()) && m.FindItemOnLayer(i.Layer) == i);
+			item = m.Items.Find(i => IsTypeOf(i.GetType()));
 
 			if (item != null)
 			{
-				if (!EquipOwners.Contains(m))
-				{
-					EquipOwners.Add(m);
-				}
-
+				EquipOwners.AddOrReplace(m);
 				return true;
 			}
 
@@ -140,9 +101,38 @@ namespace VitaNex.Modules.EquipmentSets
 			return false;
 		}
 
-		public Item CreateInstanceOfPart(params object[] args)
+		public Item[] CreateParts(params object[] args)
 		{
-			return args != null ? TypeOf.CreateInstance<Item>(args) : TypeOf.CreateInstance<Item>();
+			if (Types == null || Types.Length == 0)
+			{
+				return _EmptyItems;
+			}
+
+			var items = new Item[Types.Length];
+
+			items.SetAll(i => Types[i].CreateInstanceSafe<Item>(args));
+
+			return items;
+		}
+
+		public Item CreatePart(int index, params object[] args)
+		{
+			if (Types == null || !Types.InBounds(index))
+			{
+				return null;
+			}
+
+			return Types[index].CreateInstance<Item>(args);
+		}
+
+		public Item CreateRandomPart(params object[] args)
+		{
+			if (Types == null || Types.Length == 0)
+			{
+				return null;
+			}
+
+			return CreatePart(Utility.Random(Types.Length), args);
 		}
 
 		public virtual void GetProperties(Mobile viewer, ExtendedOPL list, bool equipped)
@@ -158,46 +148,6 @@ namespace VitaNex.Modules.EquipmentSets
 		public override string ToString()
 		{
 			return String.Format("{0}", Name);
-		}
-
-		public override void Serialize(GenericWriter writer)
-		{
-			base.Serialize(writer);
-
-			int version = writer.SetVersion(0);
-
-			switch (version)
-			{
-				case 0:
-					{
-						writer.Write(Name);
-						writer.Write(Display);
-						writer.Write(DisplaySet);
-						writer.WriteType(TypeOf.InternalType);
-						writer.Write(IncludeChildTypes);
-					}
-					break;
-			}
-		}
-
-		public override void Deserialize(GenericReader reader)
-		{
-			base.Deserialize(reader);
-
-			int version = reader.GetVersion();
-
-			switch (version)
-			{
-				case 0:
-					{
-						Name = reader.ReadString();
-						Display = reader.ReadBool();
-						DisplaySet = reader.ReadBool();
-						TypeOf = reader.ReadType();
-						IncludeChildTypes = reader.ReadBool();
-					}
-					break;
-			}
 		}
 	}
 }

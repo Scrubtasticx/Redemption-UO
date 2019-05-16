@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -37,23 +37,68 @@ namespace VitaNex.Modules.AutoPvP
 		[CommandProperty(AutoPvP.Access)]
 		public virtual bool InviteWhileRunning { get; set; }
 
+		public virtual Dictionary<PlayerMobile, MapPoint> BounceInfo { get; private set; }
+
 		public virtual bool InOtherBattle(PlayerMobile pm)
 		{
-			PvPBattle battle = AutoPvP.FindBattle(pm);
+			if (pm == null)
+			{
+				return false;
+			}
+
+			var battle = AutoPvP.FindBattle(pm);
 
 			return battle != null && battle != this && battle.IsParticipant(pm);
 		}
 
+		public bool IsAliveParticipant(PlayerMobile pm)
+		{
+			if (pm == null)
+			{
+				return false;
+			}
+
+			PvPTeam team;
+
+			return IsParticipant(pm, out team) && !team.IsDead(pm);
+		}
+
+		public bool IsDeadParticipant(PlayerMobile pm)
+		{
+			if (pm == null)
+			{
+				return false;
+			}
+
+			PvPTeam team;
+
+			return IsParticipant(pm, out team) && team.IsDead(pm);
+		}
+
 		public bool IsParticipant(PlayerMobile pm)
 		{
+			if (pm == null)
+			{
+				return false;
+			}
+
 			PvPTeam team;
+
 			return IsParticipant(pm, out team);
 		}
 
 		public bool IsParticipant(PlayerMobile pm, out PvPTeam team)
 		{
+			if (pm == null)
+			{
+				team = null;
+
+				return false;
+			}
+
 			team = FindTeam(pm);
-			return (team != null);
+
+			return team != null;
 		}
 
 		public virtual TimeSpan GetLogoutDelay(Mobile m)
@@ -63,32 +108,29 @@ namespace VitaNex.Modules.AutoPvP
 
 		public IEnumerable<PlayerMobile> GetParticipants()
 		{
-			return
-				Teams.Where(team => team != null && !team.Deleted)
-					 .SelectMany(team => team.Where(member => member != null && !member.Deleted));
+			return Teams.Where(t => t != null && !t.Deleted).SelectMany(t => t.Where(p => p != null && !p.Deleted));
 		}
 
 		public virtual bool CanSendInvites()
 		{
-			return !Hidden && (State == PvPBattleState.Preparing || (State == PvPBattleState.Running && InviteWhileRunning)) &&
-				   CurrentCapacity < MaxCapacity;
+			return !Hidden && (IsPreparing || (IsRunning && InviteWhileRunning)) && CurrentCapacity < MaxCapacity;
 		}
 
 		public virtual bool CanSendInvite(PlayerMobile pm)
 		{
-			return pm != null && !pm.Deleted && pm.Alive && !pm.Region.IsPartOf<Jail>() && pm.DesignContext == null &&
-				   IsOnline(pm) && !InCombat(pm) && IsQueued(pm) && !IsParticipant(pm) && !InOtherBattle(pm);
+			return pm != null && !pm.Deleted && pm.Alive && !pm.InRegion<Jail>() && pm.DesignContext == null && IsOnline(pm) &&
+				   !InCombat(pm) && IsQueued(pm) && !IsParticipant(pm) && !InOtherBattle(pm) && !AutoPvP.IsDeserter(pm);
 		}
 
 		public virtual void SendInvites()
 		{
-			foreach (PlayerMobile pm in Queue.Keys)
+			foreach (var pm in Queue.Keys)
 			{
 				var invites = SuperGump.GetInstances<PvPInviteGump>(pm);
 
 				if (CanSendInvite(pm))
 				{
-					bool sendNew = invites.All(invite => !invite.IsOpen || invite.Battle != this);
+					var sendNew = invites.All(invite => !invite.IsOpen || invite.Battle != this);
 
 					if (sendNew)
 					{
@@ -97,7 +139,10 @@ namespace VitaNex.Modules.AutoPvP
 				}
 				else
 				{
-					invites.Where(invite => invite.IsOpen && invite.Battle == this).ForEach(i => i.Close());
+					foreach (var invite in invites.Where(invite => invite.IsOpen && invite.Battle == this))
+					{
+						invite.Close();
+					}
 				}
 			}
 		}
@@ -110,6 +155,7 @@ namespace VitaNex.Modules.AutoPvP
 			}
 
 			invite.Send();
+
 			SendSound(pm, Options.Sounds.InviteSend);
 		}
 
@@ -140,7 +186,7 @@ namespace VitaNex.Modules.AutoPvP
 
 		protected virtual void OnInviteAccept(PlayerMobile pm)
 		{
-			if (pm == null || pm.Deleted || !IsOnline(pm))
+			if (pm == null || pm.Deleted || !IsOnline(pm) || IsInternal || Hidden)
 			{
 				return;
 			}
@@ -169,7 +215,7 @@ namespace VitaNex.Modules.AutoPvP
 				return;
 			}
 
-			PvPTeam team = Queue[pm];
+			var team = Queue[pm];
 
 			if (team == null || team.Deleted) // Assume AutoAssign is true
 			{
@@ -207,7 +253,11 @@ namespace VitaNex.Modules.AutoPvP
 			}
 
 			Queue.Remove(pm);
+
+			RecordBounce(pm);
+
 			team.AddMember(pm, true);
+
 			SendSound(pm, Options.Sounds.InviteAccept);
 		}
 
@@ -238,6 +288,43 @@ namespace VitaNex.Modules.AutoPvP
 			SendSound(pm, Options.Sounds.InviteCancel);
 		}
 
+		public void RecordBounce(PlayerMobile pm)
+		{
+			if (pm == null || pm.Deleted || pm.InRegion<PvPBattleRegion>())
+			{
+				return;
+			}
+
+			var bounce = pm.ToMapPoint();
+
+			if (bounce != null && !bounce.InternalOrZero)
+			{
+				BounceInfo[pm] = bounce;
+			}
+		}
+
+		public void Quit(Mobile m, bool teleport)
+		{
+			var pm = m as PlayerMobile;
+
+			if (pm != null)
+			{
+				PvPTeam team;
+
+				if (IsParticipant(pm, out team))
+				{
+					UpdateStatistics(team, pm, o => ++o.Losses);
+
+					if (IsRunning)
+					{
+						OnDeserted(team, pm);
+					}
+				}
+			}
+
+			Eject(m, teleport);
+		}
+
 		public void Eject(Mobile m, bool teleport)
 		{
 			if (m == null || m.Deleted)
@@ -266,19 +353,9 @@ namespace VitaNex.Modules.AutoPvP
 
 			if (IsParticipant(pm, out team))
 			{
-				if (State == PvPBattleState.Running || State == PvPBattleState.Ended)
+				if (IsRunning || IsEnded)
 				{
-					EnsureStatistics(pm).Battles = 1;
-
-					if (State == PvPBattleState.Running)
-					{
-						EnsureStatistics(pm).Losses = 1;
-
-						int points = GetAwardPoints(team, pm);
-
-						EnsureStatistics(pm).PointsLost += points;
-						AutoPvP.EnsureProfile(pm).Points -= points;
-					}
+					UpdateStatistics(team, pm, o => ++o.Battles);
 				}
 
 				team.RemoveMember(pm, false);
@@ -290,7 +367,18 @@ namespace VitaNex.Modules.AutoPvP
 
 			if (teleport)
 			{
-				Teleport(pm, Options.Locations.Eject, Options.Locations.Eject.Map);
+				var bounce = BounceInfo.GetValue(pm);
+
+				if (bounce != null && !bounce.InternalOrZero)
+				{
+					Teleport(pm, bounce, bounce);
+
+					BounceInfo.Remove(pm);
+				}
+				else
+				{
+					Teleport(pm, Options.Locations.Eject, Options.Locations.Eject.Map);
+				}
 			}
 		}
 
@@ -301,19 +389,21 @@ namespace VitaNex.Modules.AutoPvP
 				return;
 			}
 
+			var pet = bc.IsControlled<PlayerMobile>();
+
 			if (!teleportOrStable)
 			{
-				bc.Delete();
+				if (!pet)
+				{
+					bc.Delete();
+				}
+
 				return;
 			}
 
-			if (bc.ControlMaster is PlayerMobile)
+			if (!pet || !bc.Stable())
 			{
-				bc.Stable();
-			}
-			else
-			{
-				Teleport(bc, Options.Locations.Eject, Options.Locations.Eject.Map);
+				Teleport(bc, Options.Locations.Eject, Options.Locations.Eject);
 			}
 		}
 
@@ -345,9 +435,27 @@ namespace VitaNex.Modules.AutoPvP
 		protected virtual void OnEjected(BaseCreature bc)
 		{ }
 
+		protected virtual void OnDeserted(PvPTeam team, PlayerMobile pm)
+		{
+			if (pm == null || pm.Deleted)
+			{
+				return;
+			}
+
+			pm.SendMessage(0x22, "You have deserted {0}!", Name);
+
+			AutoPvP.AddDeserter(pm);
+
+			RevokePoints(pm);
+
+			UpdateStatistics(team, pm, o => ++o["Deserted"]);
+
+			WorldBroadcast("{0} has deserted {1}!", pm.RawName, Name);
+		}
+
 		public virtual void InvalidateStray(Mobile m)
 		{
-			if (m == null || m.Deleted || State == PvPBattleState.Internal || Hidden)
+			if (IsInternal || Hidden || m == null || m.Deleted)
 			{
 				return;
 			}
@@ -358,9 +466,9 @@ namespace VitaNex.Modules.AutoPvP
 			}
 			else if (m is BaseCreature)
 			{
-				BaseCreature bc = (BaseCreature)m;
+				var bc = (BaseCreature)m;
 
-				if (bc.ControlMaster != null)
+				if (bc.IsControlled())
 				{
 					InvalidateStrayPet(bc);
 				}
@@ -373,12 +481,12 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void InvalidateStrayPlayer(PlayerMobile player)
 		{
-			if (player == null || player.Deleted || player.Region == null || State == PvPBattleState.Internal || Hidden)
+			if (IsInternal || Hidden || player == null || player.Deleted)
 			{
 				return;
 			}
 
-			if (player.Region.IsPartOf(SpectateRegion))
+			if (player.InRegion(SpectateRegion))
 			{
 				if (IsParticipant(player))
 				{
@@ -390,7 +498,7 @@ namespace VitaNex.Modules.AutoPvP
 					AddSpectator(player, false);
 				}
 			}
-			else if (player.Region.IsPartOf(BattleRegion))
+			else if (player.InRegion(BattleRegion))
 			{
 				if (IsParticipant(player))
 				{
@@ -399,17 +507,28 @@ namespace VitaNex.Modules.AutoPvP
 						RemoveSpectator(player, false);
 					}
 
-					if (IsQueued(player))
-					{
-						Queue.Remove(player);
-					}
+					Queue.Remove(player);
 
-					if (player.Mounted && (DebugMode || player.AccessLevel < AccessLevel.Counselor))
+					if (DebugMode || player.AccessLevel < AccessLevel.Counselor)
 					{
-						if ((player.Mount is EtherealMount && !Options.Rules.CanMountEthereal) ||
-							(player.Mount is BaseMount && !Options.Rules.CanMount))
+						if (player.Flying && !Options.Rules.CanFly)
 						{
-							player.SetMountBlock(BlockMountType.None, TimeSpan.FromSeconds(3), true);
+							player.Flying = false;
+						}
+
+						if (player.Mounted)
+						{
+							var canMount = Options.Rules.CanMount;
+
+							if (player.Mount is EtherealMount)
+							{
+								canMount = Options.Rules.CanMountEthereal;
+							}
+
+							if (!canMount)
+							{
+								player.Dismount();
+							}
 						}
 					}
 				}
@@ -419,7 +538,7 @@ namespace VitaNex.Modules.AutoPvP
 					{
 						AddSpectator(player, true);
 					}
-					else if (player.AccessLevel < AccessLevel.Counselor)
+					else if (DebugMode || player.AccessLevel < AccessLevel.Counselor)
 					{
 						Eject(player, true);
 					}
@@ -427,29 +546,34 @@ namespace VitaNex.Modules.AutoPvP
 			}
 		}
 
-		public virtual void InvalidateStraySpawn(BaseCreature creature)
+		public virtual void InvalidateStraySpawn(BaseCreature mob)
 		{
-			if (creature == null || creature.Deleted || creature.Region == null || State == PvPBattleState.Internal || Hidden)
+			if (IsInternal || Hidden || mob == null || mob.Deleted || !mob.InRegion(BattleRegion))
 			{
 				return;
 			}
 
 			if (!AllowSpawn())
 			{
-				Eject(creature, creature.ControlMaster != null);
+				Eject(mob, mob.IsControlled<PlayerMobile>());
 			}
 		}
 
 		public virtual void InvalidateStrayPet(BaseCreature pet)
 		{
-			if (pet == null || pet.Deleted || pet.Region == null || State == PvPBattleState.Internal || Hidden)
+			if (IsInternal || Hidden || pet == null || pet.Deleted || !pet.InRegion(BattleRegion))
 			{
 				return;
 			}
 
-			if (!Options.Rules.AllowPets && (DebugMode || pet.ControlMaster.AccessLevel < AccessLevel.Counselor))
+			if (!Options.Rules.AllowPets)
 			{
-				Eject(pet, pet.ControlMaster != null);
+				var master = pet.GetMaster<PlayerMobile>();
+
+				if (master == null || DebugMode || master.AccessLevel < AccessLevel.Counselor)
+				{
+					Eject(pet, master != null);
+				}
 			}
 		}
 
@@ -461,8 +585,7 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void InvalidateSpectateGate()
 		{
-			if (!SpectateAllowed || SpectateRegion == null || State == PvPBattleState.Internal ||
-				Options.Locations.SpectateGate.Internal || Options.Locations.SpectateGate.Zero)
+			if (!SpectateAllowed || SpectateRegion == null || IsInternal || Options.Locations.SpectateGate.InternalOrZero)
 			{
 				if (Gate != null)
 				{
@@ -491,7 +614,7 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void InvalidateTeamGates()
 		{
-			Teams.ForEach(t => t.InvalidateGate());
+			ForEachTeam(t => t.InvalidateGate());
 		}
 	}
 }

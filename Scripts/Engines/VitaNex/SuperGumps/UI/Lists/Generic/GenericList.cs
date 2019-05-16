@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -13,8 +13,8 @@
 using System;
 using System.Collections.Generic;
 
+using Server;
 using Server.Gumps;
-using Server.Mobiles;
 #endregion
 
 namespace VitaNex.SuperGumps.UI
@@ -33,7 +33,7 @@ namespace VitaNex.SuperGumps.UI
 		public virtual Action ClearCallback { get; set; }
 
 		public GenericListGump(
-			PlayerMobile user,
+			Mobile user,
 			Gump parent = null,
 			int? x = null,
 			int? y = null,
@@ -134,14 +134,14 @@ namespace VitaNex.SuperGumps.UI
 
 			CompileEntryOptions(opts, entry);
 
-			Send(new MenuGump(User, Refresh(), opts, button));
+			new MenuGump(User, Refresh(), opts, button).Send();
 		}
 
 		protected virtual void CompileEntryOptions(MenuGumpOptions opts, T entry)
 		{
 			if (CanRemove)
 			{
-				opts.AppendEntry(new ListGumpEntry("Remove", b => HandleRemove(entry), ErrorHue));
+				opts.AppendEntry("Remove", b => HandleRemove(entry), ErrorHue);
 			}
 		}
 
@@ -152,7 +152,8 @@ namespace VitaNex.SuperGumps.UI
 				return;
 			}
 
-			T obj = GetListAddObject();
+			var obj = GetListAddObject();
+
 			AddToList(obj);
 		}
 
@@ -180,6 +181,7 @@ namespace VitaNex.SuperGumps.UI
 			}
 
 			var destList = GetExternalList();
+
 			ApplyChangesToList(destList);
 		}
 
@@ -191,18 +193,27 @@ namespace VitaNex.SuperGumps.UI
 			}
 
 			var restoList = GetExternalList();
+
 			ClearChanges(restoList);
 		}
 
 		public abstract List<T> GetExternalList();
 		public abstract T GetListAddObject();
 
+		public virtual bool Validate(T obj)
+		{
+			return obj != null;
+		}
+
 		public virtual void AddToList(T obj)
 		{
-			if (obj != null && !List.Contains(obj))
+			if (!Validate(obj))
 			{
-				List.Add(obj);
+				Refresh();
+				return;
 			}
+
+			List.Add(obj);
 
 			if (AddCallback != null)
 			{
@@ -303,19 +314,21 @@ namespace VitaNex.SuperGumps.UI
 		{
 			base.OnClosed(all);
 
-			if (ChangesPending)
+			if (!ChangesPending)
 			{
-				Send(
-					new ConfirmDialogGump(
-						User,
-						title: "Apply Changes?",
-						html: "There are changes waiting that have not been applied.\nDo you want to apply them now?",
-						onAccept: b =>
-						{
-							HandleApplyChanges();
-							Close(all);
-						}));
+				return;
 			}
+
+			new ConfirmDialogGump(User)
+			{
+				Title = "Apply Changes?",
+				Html = "There are changes waiting that have not been applied.\nDo you want to apply them now?",
+				AcceptHandler = b =>
+				{
+					HandleApplyChanges();
+					Close(all);
+				}
+			}.Send();
 		}
 	}
 }

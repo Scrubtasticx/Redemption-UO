@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -18,9 +18,7 @@ using System.Linq;
 using Server;
 using Server.Commands;
 using Server.Gumps;
-using Server.Mobiles;
 
-using VitaNex.SuperGumps;
 using VitaNex.SuperGumps.UI;
 #endregion
 
@@ -30,24 +28,13 @@ namespace VitaNex.Commands
 	{
 		public static void Initialize()
 		{
-			CommandSystem.Register(
-				"MyCommands",
-				AccessLevel.Player,
-				e =>
-				{
-					if (e == null || e.Mobile == null || !(e.Mobile is PlayerMobile))
-					{
-						return;
-					}
-
-					SuperGump.Send(new MyCommandsGump(e.Mobile as PlayerMobile));
-				});
+			CommandSystem.Register("MyCommands", AccessLevel.Player, e => new MyCommandsGump(e.Mobile).Send());
 		}
 	}
 
 	public class MyCommandsGump : ListGump<CommandEntry>
 	{
-		public MyCommandsGump(PlayerMobile user, Gump parent = null)
+		public MyCommandsGump(Mobile user, Gump parent = null)
 			: base(user, parent, title: "My Commands", emptyText: "No commands to display.")
 		{
 			Sorted = true;
@@ -63,19 +50,11 @@ namespace VitaNex.Commands
 
 		public override int SortCompare(CommandEntry a, CommandEntry b)
 		{
-			if (a == null && b == null)
-			{
-				return 0;
-			}
+			var res = 0;
 
-			if (a == null)
+			if (a.CompareNull(b, ref res))
 			{
-				return 1;
-			}
-
-			if (b == null)
-			{
-				return -1;
+				return res;
 			}
 
 			if (a.AccessLevel > b.AccessLevel)
@@ -95,11 +74,11 @@ namespace VitaNex.Commands
 		{
 			list.Clear();
 
-			list.AddRange(
-				CommandSystem.Entries.Values.Where(
-					cmd =>
-					cmd.AccessLevel <= User.AccessLevel && !String.IsNullOrWhiteSpace(cmd.Command) &&
-					!Insensitive.Equals(cmd.Command, "MyCommands")));
+			var commands = CommandUtility.EnumerateCommands(User.AccessLevel);
+
+			commands = commands.Where(c => !Insensitive.Equals(c.Command, "MyCommands"));
+
+			list.AddRange(commands);
 
 			base.CompileList(list);
 		}
@@ -116,8 +95,8 @@ namespace VitaNex.Commands
 		protected override string GetLabelText(int index, int pageIndex, CommandEntry entry)
 		{
 			return entry != null && !String.IsNullOrWhiteSpace(entry.Command)
-					   ? entry.Command[0].ToString(CultureInfo.InvariantCulture).ToUpper() + entry.Command.Substring(1)
-					   : base.GetLabelText(index, pageIndex, entry);
+				? entry.Command[0].ToString(CultureInfo.InvariantCulture).ToUpper() + entry.Command.Substring(1)
+				: base.GetLabelText(index, pageIndex, entry);
 		}
 
 		protected override int GetLabelHue(int index, int pageIndex, CommandEntry entry)

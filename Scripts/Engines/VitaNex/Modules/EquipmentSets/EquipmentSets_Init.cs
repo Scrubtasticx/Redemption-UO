@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,44 +12,51 @@
 #region References
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Server;
 using Server.Network;
 
-using VitaNex.IO;
 using VitaNex.Network;
 #endregion
 
 namespace VitaNex.Modules.EquipmentSets
 {
-	[CoreModule("Equipment Sets", "1.0.0.0")]
+	[CoreModule("Equipment Sets", "3.0.0.0")]
 	public static partial class EquipmentSets
 	{
 		static EquipmentSets()
 		{
 			CMOptions = new EquipmentSetsOptions();
 
-			Sets = new BinaryDataStore<Type, EquipmentSet>(VitaNexCore.SavesDirectory + "/EquipSets", "Sets")
+			SetTypes = TypeOfEquipmentSet.GetConstructableChildren();
+
+			Sets = new Dictionary<Type, EquipmentSet>(SetTypes.Length);
+
+			foreach (var t in SetTypes)
 			{
-				OnSerialize = SaveSets,
-				OnDeserialize = LoadSets
-			};
+				Sets[t] = t.CreateInstanceSafe<EquipmentSet>();
+			}
 		}
 
 		private static void CMConfig()
 		{
 			EquipItemRequestParent = PacketHandlers.GetHandler(0x13);
+			EquipItemRequestParent6017 = PacketHandlers.Get6017Handler(0x13);
+
 			DropItemRequestParent = PacketHandlers.GetHandler(0x08);
 			DropItemRequestParent6017 = PacketHandlers.Get6017Handler(0x08);
 
 			EquipItemParent = OutgoingPacketOverrides.GetHandler(0x2E);
+			EquipItemParent6017 = OutgoingPacketOverrides.GetHandler(0x2E);
 
 			PacketHandlers.Register(0x13, 10, true, EquipItemRequest);
-			//PacketHandlers.Register6017(0x13, 10, true, EquipItemRequest6017);
+			PacketHandlers.Register6017(0x13, 10, true, EquipItemRequest6017);
+
 			PacketHandlers.Register(0x08, 14, true, DropItemRequest);
 			PacketHandlers.Register6017(0x08, 15, true, DropItemRequest6017);
 
-			OutgoingPacketOverrides.Register(0x2E, true, EquipItem);
+			OutgoingPacketOverrides.Register(0x2E, EquipItem);
 		}
 
 		private static void CMInvoke()
@@ -58,18 +65,25 @@ namespace VitaNex.Modules.EquipmentSets
 			ExtendedOPL.OnItemOPLRequest += GetProperties;
 		}
 
-		private static void CMSave()
+		private static void CMEnabled()
 		{
-			DataStoreResult result = Sets.Export();
-			CMOptions.ToConsole("{0:#,0} sets saved, {1}", Sets.Count, result);
+			if (World.Loaded)
+			{
+				World.Mobiles.Values.AsParallel()
+					 .Where(m => m.Items != null && m.Items.Any(i => i.Layer.IsEquip()))
+					 .ForEach(Invalidate);
+			}
 		}
 
-		private static void CMLoad()
+		private static void CMDisabled()
 		{
-			DataStoreResult result = Sets.Import();
-			CMOptions.ToConsole("{0:#,0} sets loaded, {1}.", Sets.Count, result);
-
-			Sync();
+			if (World.Loaded)
+			{
+				foreach (var set in Sets.Values)
+				{
+					set.ActiveOwners.ForEachReverse(Invalidate);
+				}
+			}
 		}
 
 		private static void CMDispose()
@@ -79,12 +93,10 @@ namespace VitaNex.Modules.EquipmentSets
 				PacketHandlers.Register(0x13, 10, true, EquipItemRequestParent.OnReceive);
 			}
 
-			/*
 			if (EquipItemRequestParent6017 != null && EquipItemRequestParent6017.OnReceive != null)
 			{
 				PacketHandlers.Register6017(0x13, 10, true, EquipItemRequestParent6017.OnReceive);
 			}
-			*/
 
 			if (DropItemRequestParent != null && DropItemRequestParent.OnReceive != null)
 			{
@@ -95,42 +107,6 @@ namespace VitaNex.Modules.EquipmentSets
 			{
 				PacketHandlers.Register6017(0x08, 15, true, DropItemRequestParent6017.OnReceive);
 			}
-		}
-
-		private static bool SaveSets(GenericWriter writer)
-		{
-			int version = writer.SetVersion(0);
-
-			switch (version)
-			{
-				case 0:
-					writer.WriteBlockDictionary(Sets, (w, k, v) => w.WriteType(v, t => v.Serialize(w)));
-					break;
-			}
-
-			return true;
-		}
-
-		private static bool LoadSets(GenericReader reader)
-		{
-			int version = reader.GetVersion();
-
-			switch (version)
-			{
-				case 0:
-					{
-						reader.ReadBlockDictionary(
-							r =>
-							{
-								EquipmentSet v = r.ReadTypeCreate<EquipmentSet>(r);
-								return new KeyValuePair<Type, EquipmentSet>(v.GetType(), v);
-							},
-							Sets);
-					}
-					break;
-			}
-
-			return true;
 		}
 	}
 }

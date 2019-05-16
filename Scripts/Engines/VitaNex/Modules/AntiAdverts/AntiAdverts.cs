@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -16,35 +16,62 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 
+using Server;
 using Server.Accounting;
 using Server.Engines.Help;
+using Server.Misc;
 using Server.Mobiles;
-using Server.Network;
 
-using VitaNex;
 using VitaNex.IO;
 using VitaNex.SuperGumps.UI;
 using VitaNex.Text;
 #endregion
 
-namespace Server.Misc
+namespace VitaNex.Modules.AntiAdverts
 {
 	public static partial class AntiAdverts
 	{
 		public const AccessLevel Access = AccessLevel.Administrator;
 
-		private static AntiAdvertsOptions _CMOptions = new AntiAdvertsOptions();
+		public static AntiAdvertsOptions CMOptions { get; private set; }
 
-		public static AntiAdvertsOptions CMOptions { get { return _CMOptions ?? (_CMOptions = new AntiAdvertsOptions()); } }
-
-		public static FileInfo ReportsFile { get { return IOUtility.EnsureFile(VitaNexCore.SavesDirectory + "/AntiAdverts/Reports.bin"); } }
+		public static FileInfo ReportsFile
+		{
+			get { return IOUtility.EnsureFile(VitaNexCore.SavesDirectory + "/AntiAdverts/Reports.bin"); }
+		}
 
 		public static List<AntiAdvertsReport> Reports { get; private set; }
+
+		public static event Action<AntiAdvertNotifyGump> OnBeforeSendGump;
+		public static event Action<AntiAdvertNotifyGump> OnAfterSendGump;
+
+		private static void InvokeOnBeforeSendGump(AntiAdvertNotifyGump g)
+		{
+			if (OnBeforeSendGump != null)
+			{
+				OnBeforeSendGump(g);
+			}
+		}
+
+		private static void InvokeOnAfterSendGump(AntiAdvertNotifyGump g)
+		{
+			if (OnAfterSendGump != null)
+			{
+				OnAfterSendGump(g);
+			}
+		}
+
+		public static bool Detect(string text)
+		{
+			string keyword;
+
+			return Detect(text, out keyword);
+		}
 
 		public static bool Detect(string text, out string keyword)
 		{
 			// Does the speech contain any forbidden key words?
-			foreach (string kw in CMOptions.KeyWords)
+			foreach (var kw in CMOptions.KeyWords)
 			{
 				if (CMOptions.SearchMode.Execute(text, kw, CMOptions.SearchCapsIgnore))
 				{
@@ -57,9 +84,8 @@ namespace Server.Misc
 					continue;
 				}
 
-				foreach (string kwr in
-					CMOptions.WhitespaceAliases.Select(wa => kw.Replace(' ', wa))
-							 .Where(kwr => CMOptions.SearchMode.Execute(text, kwr, CMOptions.SearchCapsIgnore)))
+				foreach (var kwr in CMOptions.WhitespaceAliases.Select(wa => kw.Replace(' ', wa))
+											 .Where(kwr => CMOptions.SearchMode.Execute(text, kwr, CMOptions.SearchCapsIgnore)))
 				{
 					keyword = kwr;
 					return true;
@@ -85,8 +111,8 @@ namespace Server.Misc
 				return;
 			}
 
-			bool banned = Ban(e.Mobile, e.Speech);
-			bool jailed = Jail(e.Mobile, e.Speech);
+			var banned = Ban(e.Mobile, e.Speech);
+			var jailed = Jail(e.Mobile, e.Speech);
 
 			ToConsole(e.Mobile, e.Speech, jailed, banned);
 			ToLog(e.Mobile, e.Speech, jailed, banned);
@@ -113,7 +139,7 @@ namespace Server.Misc
 				0,
 				new AntiAdvertsReport(
 					DateTime.Now,
-					(PlayerMobile)e.Mobile,
+					e.Mobile,
 					GetDetectedString(false, e.Mobile, e.Speech, jailed, banned),
 					e.Speech,
 					jailed,
@@ -129,17 +155,16 @@ namespace Server.Misc
 				return String.Empty;
 			}
 
-			return
-				String.Format(
-					lines
-						? "IP('{0}')\nAccount('{1}')\nChar('{2}')\nJail('{3}')\nBan('{4}')\nQuote(\"{5}\")"
-						: "IP('{0}') Account('{1}') Char('{2}') Jail('{3}') Ban('{4}') Quote(\"{5}\")",
-					m.NetState.Address,
-					m.Account.Username,
-					m.RawName,
-					jailed ? "yes" : "no",
-					banned ? "yes" : "no",
-					speech);
+			return String.Format(
+				lines
+					? "IP('{0}')\nAccount('{1}')\nChar('{2}')\nJail('{3}')\nBan('{4}')\nQuote(\"{5}\")"
+					: "IP('{0}') Account('{1}') Char('{2}') Jail('{3}') Ban('{4}') Quote(\"{5}\")",
+				m.NetState.Address,
+				m.Account.Username,
+				m.RawName,
+				jailed ? "yes" : "no",
+				banned ? "yes" : "no",
+				speech);
 		}
 
 		private static void ToConsole(Mobile m, string speech, bool jailed, bool banned)
@@ -155,7 +180,9 @@ namespace Server.Misc
 			if (m != null && !m.Deleted && !String.IsNullOrWhiteSpace(speech) && CMOptions.LogEnabled)
 			{
 				String.Format(
-					"[{0}]: {1}", DateTime.Now.TimeOfDay.ToSimpleString("h:m"), GetDetectedString(false, m, speech, jailed, banned))
+						  "[{0}]: {1}",
+						  DateTime.Now.TimeOfDay.ToSimpleString("h:m"),
+						  GetDetectedString(false, m, speech, jailed, banned))
 					  .Log("DetectedAdvertisers.log");
 			}
 		}
@@ -167,13 +194,15 @@ namespace Server.Misc
 				return;
 			}
 
-			PageEntry entry = PageQueue.GetEntry(m);
+			var entry = PageQueue.GetEntry(m);
 
 			if (entry == null || !entry.Message.StartsWith("[Warning: Advertising Detected]"))
 			{
 				PageQueue.Enqueue(
 					new PageEntry(
-						m, "[Warning: Advertising Detected]: " + GetDetectedString(true, m, speech, jailed, banned), PageType.Account));
+						m,
+						"[Warning: Advertising Detected]: " + GetDetectedString(true, m, speech, jailed, banned),
+						PageType.Account));
 			}
 		}
 
@@ -190,12 +219,15 @@ namespace Server.Misc
 			{
 				message = "[Warning: Advertising Detected]: " + GetDetectedString(true, m, speech, jailed, banned);
 
-				NetState.Instances.AsParallel()
-						.Where(
-							ns =>
-							ns != null && ns.Mobile != null && ns.Mobile is PlayerMobile && !ns.Mobile.Deleted &&
-							ns.Mobile.AccessLevel >= CMOptions.NotifyAccess)
-						.ForEach(ns => ns.Mobile.SendNotification<AntiAdvertNotifyGump>(message, false, color: Color.OrangeRed));
+				Notify.Notify.Broadcast<AntiAdvertNotifyGump>(
+					message,
+					false,
+					1.0,
+					3.0,
+					Color.OrangeRed,
+					InvokeOnBeforeSendGump,
+					InvokeOnAfterSendGump,
+					CMOptions.NotifyAccess);
 			}
 
 			if (!CMOptions.NotifyPlayer)

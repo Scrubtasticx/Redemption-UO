@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -41,11 +41,13 @@ namespace VitaNex
 		private static void CSConfig()
 		{
 			EventSink.CharacterCreated += e => Register(e.Mobile as PlayerMobile);
+
 			EventSink.Login += e =>
 			{
 				Register(e.Mobile as PlayerMobile);
 				ValidateSharedName(e.Mobile as PlayerMobile);
 			};
+
 			EventSink.Logout += e => Register(e.Mobile as PlayerMobile);
 			EventSink.PlayerDeath += e => Register(e.Mobile as PlayerMobile);
 
@@ -72,13 +74,21 @@ namespace VitaNex
 				});
 		}
 
+		public static void Clear()
+		{
+			Registry.Clear();
+		}
+
 		public static void Index()
 		{
-			CSOptions.ToConsole("Indexing names...");
+			CSOptions.ToConsole("Indexing...");
+			World.Broadcast(0x55, true, "Indexing player names...");
 
 			World.Mobiles.Values.AsParallel().OfType<PlayerMobile>().ForEach(Register);
 
+			World.Broadcast(0x55, true, "Indexing complete.");
 			CSOptions.ToConsole("Indexing complete.");
+
 			CSOptions.ToConsole(
 				"{0:#,0} registered names by {1:#,0} players.",
 				Registry.Count,
@@ -121,7 +131,7 @@ namespace VitaNex
 			reader.ReadBlockDictionary(
 				r =>
 				{
-					string name = r.ReadString();
+					var name = r.ReadString();
 					var players = r.ReadStrongMobileList<PlayerMobile>();
 					return new KeyValuePair<string, List<PlayerMobile>>(name, players);
 				},

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -25,31 +25,31 @@ namespace VitaNex.Modules.Voting
 	{
 		public static StringBuilder GetHelpText(Mobile m)
 		{
-			StringBuilder help = new StringBuilder();
+			var help = new StringBuilder();
 
-			help.AppendFormat("<basefont color=#{0:X6}>", Color.SkyBlue.ToArgb());
+			help.AppendFormat("<basefont color=#{0:X6}>", Color.SkyBlue.ToRgb());
 			help.AppendLine(
 				"The Voting service allows you to vote for " + ServerList.ServerName + " and receive rewards (usually tokens).");
 
 			if (Voting.CMOptions.DailyLimit > 0)
 			{
 				help.AppendLine();
-				help.AppendFormat("<basefont color=#{0:X6}>", Color.Orange.ToArgb());
+				help.AppendFormat("<basefont color=#{0:X6}>", Color.Orange.ToRgb());
 				help.AppendLine(
 					String.Format(
-						"There is a daily limit of {0} tokens, when you reach this limit you can still vote, but will not receive any tokens.",
-						Voting.CMOptions.DailyLimit.ToString("#,#")));
+						"There is a daily limit of {0:#,0} tokens, when you reach this limit you can still vote, but will not receive any tokens.",
+						Voting.CMOptions.DailyLimit));
 			}
 
 			help.AppendLine();
-			help.AppendFormat("<basefont color=#{0:X6}>", Color.Yellow.ToArgb());
+			help.AppendFormat("<basefont color=#{0:X6}>", Color.Yellow.ToRgb());
 			help.AppendLine("All successful votes will be logged to your personal vote profile.");
 			help.AppendLine("These logs are separated by day and can be viewed at any time.");
 
 			if (!String.IsNullOrWhiteSpace(Voting.CMOptions.ProfilesCommand))
 			{
 				help.AppendLine();
-				help.AppendFormat("<basefont color=#{0:X6}>", Color.YellowGreen.ToArgb());
+				help.AppendFormat("<basefont color=#{0:X6}>", Color.YellowGreen.ToRgb());
 				help.AppendLine(
 					String.Format(
 						"To view vote profiles, use the <big>{0}{1}</big> command.",
@@ -67,7 +67,7 @@ namespace VitaNex.Modules.Voting
 				if (!String.IsNullOrWhiteSpace(Voting.CMOptions.AdminCommand))
 				{
 					help.AppendLine();
-					help.AppendFormat("<basefont color=#{0:X6}>", Color.LimeGreen.ToArgb());
+					help.AppendFormat("<basefont color=#{0:X6}>", Color.LimeGreen.ToRgb());
 					help.AppendLine(
 						String.Format(
 							"To administrate the voting system, use the <big>{0}{1}</big> command.",

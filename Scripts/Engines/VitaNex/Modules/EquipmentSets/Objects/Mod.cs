@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -20,44 +20,37 @@ using VitaNex.Network;
 
 namespace VitaNex.Modules.EquipmentSets
 {
-	public abstract class EquipmentSetMod : PropertyObject
+	public abstract class EquipmentSetMod : IExpansionCheck
 	{
-		private readonly List<Mobile> _ActiveOwners = new List<Mobile>();
+		public List<Mobile> ActiveOwners { get; private set; }
 
-		public List<Mobile> ActiveOwners { get { return _ActiveOwners; } }
-
-		[CommandProperty(EquipmentSets.Access)]
 		public string Name { get; set; }
-
-		[CommandProperty(EquipmentSets.Access)]
 		public string Desc { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
 		public int PartsRequired { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
 		public bool Display { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
-		public bool Valid { get { return Validate(); } }
+		public ExpansionFlags Expansions { get; set; }
 
-		public EquipmentSetMod(string name = "Set Mod", string desc = null, int partsReq = 1, bool display = true)
+		public EquipmentSetMod(
+			string name = "Set Mod",
+			string desc = null,
+			int partsReq = 1,
+			bool display = true,
+			ExpansionFlags ex = ExpansionFlags.None)
 		{
 			Name = name;
 			Desc = desc ?? String.Empty;
+
 			Display = display;
+
 			PartsRequired = partsReq;
+
+			Expansions = ex;
+
+			ActiveOwners = new List<Mobile>();
 		}
-
-		public EquipmentSetMod(GenericReader reader)
-			: base(reader)
-		{ }
-
-		public override void Clear()
-		{ }
-
-		public override void Reset()
-		{ }
 
 		public bool IsActive(Mobile m)
 		{
@@ -66,18 +59,14 @@ namespace VitaNex.Modules.EquipmentSets
 
 		public bool Activate(Mobile m, Tuple<EquipmentSetPart, Item>[] equipped)
 		{
-			if (m == null || m.Deleted || equipped == null)
+			if (m == null || m.Deleted || equipped == null || !this.CheckExpansion())
 			{
 				return false;
 			}
 
 			if (OnActivate(m, equipped))
 			{
-				if (!ActiveOwners.Contains(m))
-				{
-					ActiveOwners.Add(m);
-				}
-
+				ActiveOwners.AddOrReplace(m);
 				return true;
 			}
 
@@ -91,79 +80,62 @@ namespace VitaNex.Modules.EquipmentSets
 				return false;
 			}
 
-			return OnDeactivate(m, equipped) && ActiveOwners.Remove(m);
+			if (OnDeactivate(m, equipped))
+			{
+				ActiveOwners.Remove(m);
+				return true;
+			}
+
+			return false;
 		}
 
 		protected abstract bool OnActivate(Mobile m, Tuple<EquipmentSetPart, Item>[] equipped);
 		protected abstract bool OnDeactivate(Mobile m, Tuple<EquipmentSetPart, Item>[] equipped);
 
-		public virtual bool Validate()
-		{
-			return !String.IsNullOrWhiteSpace(Name);
-		}
-
 		public virtual void GetProperties(Mobile viewer, ExtendedOPL list, bool equipped)
 		{
-			if (!String.IsNullOrEmpty(Desc))
+			if (!this.CheckExpansion())
 			{
-				list.Add(
-					"[{0:#,0}] {1}: {2}".WrapUOHtmlColor(
-						equipped && IsActive(viewer) ? EquipmentSets.CMOptions.ModNameColorRaw : EquipmentSets.CMOptions.InactiveColorRaw),
-					PartsRequired,
-					Name.ToUpperWords(),
-					Desc);
+				return;
+			}
+
+			string value;
+
+			if (String.IsNullOrEmpty(Desc))
+			{
+				if (String.IsNullOrWhiteSpace(Name))
+				{
+					return;
+				}
+
+				value = String.Format("[{0:#,0}] {1}", PartsRequired, Name.ToUpperWords());
+			}
+			else if (String.IsNullOrWhiteSpace(Name))
+			{
+				value = String.Format("[{0:#,0}]: {1}", PartsRequired, Desc);
 			}
 			else
 			{
-				list.Add(
-					"[{0:#,0}] {1}".WrapUOHtmlColor(
-						equipped && IsActive(viewer) ? EquipmentSets.CMOptions.ModNameColorRaw : EquipmentSets.CMOptions.InactiveColorRaw),
-					PartsRequired,
-					Name.ToUpperWords());
+				value = String.Format("[{0:#,0}] {1}: {2}", PartsRequired, Name.ToUpperWords(), Desc);
 			}
+
+			if (String.IsNullOrWhiteSpace(value))
+			{
+				return;
+			}
+
+			var color = equipped && IsActive(viewer)
+				? EquipmentSets.CMOptions.ModNameColorRaw
+				: EquipmentSets.CMOptions.InactiveColorRaw;
+
+			value = value.WrapUOHtmlColor(color);
+
+			list.Add(value);
 		}
 
 		public override string ToString()
 		{
 			return String.Format("{0}", Name);
-		}
-
-		public override void Serialize(GenericWriter writer)
-		{
-			base.Serialize(writer);
-
-			int version = writer.SetVersion(0);
-
-			switch (version)
-			{
-				case 0:
-					{
-						writer.Write(Name);
-						writer.Write(Desc);
-						writer.Write(Display);
-						writer.Write(PartsRequired);
-					}
-					break;
-			}
-		}
-
-		public override void Deserialize(GenericReader reader)
-		{
-			base.Deserialize(reader);
-
-			int version = reader.GetVersion();
-
-			switch (version)
-			{
-				case 0:
-					{
-						Name = reader.ReadString();
-						Desc = reader.ReadString();
-						Display = reader.ReadBool();
-						PartsRequired = reader.ReadInt();
-					}
-					break;
-			}
 		}
 	}
 }

@@ -1,5 +1,5 @@
 ﻿Vita-Nex: Core (VNc)
-Copyright (c) 2013, Vita-Nex | http://core.vita-nex.com
+Copyright (c) 2016, Vita-Nex | http://core.vita-nex.com
 
 A dynamic extension library for RunUO, written in C#, targeting .NET Framework 4.0
 
@@ -9,6 +9,21 @@ while maintaining 100% "plug & play" capability.
 
 *** Requires RunUO server software be compiled targeting .NET Framework 4.0
 *** Supports Mono 2.6, but there are known issues with Mono's support of .NET Framework 4.0 features, such as optional parameters.
+
+***
+
+Installation:
+
+Recommended directory path: Scripts/VitaNex/Core/
+
+Install the entire project to the above recommended directory path;
+An example of a correct path is "Scripts/VitaNex/Core/VNC.cfg"
+All project files and folders should be installed here.
+
+The above path is recommended, you may use a different path, as long as the project is installed to a sub-directory of Scripts/
+For example: "Scripts/Customs/VNc"
+
+When all the files are installed, you should be able to boot up your server without errors, as long as you have met the requirements for installation; see notes below for more information.
 
 ***
 
@@ -47,11 +62,9 @@ reduce the amount of console output, errors will usually be logged to a file in 
 
 The first thing I would do after installing Vita-Nex: Core, is log-in and use one of these commands (no quotes):
 
-"[SpecialFX Random"
-"[ExplodeFX Random"
-"[WaveFX Random"
-
-If you want to see a list of a command's arguments, just use a command without any arguments.
+"[VNC"
+"[VNC SRV"
+"[VNC MOD"
 
 You can also use the "[MyCommands" command to see a searchable list of all commands you have access to on the shard.
 
@@ -59,8 +72,7 @@ You can also use the "[MyCommands" command to see a searchable list of all comma
 
 If you have any compile errors when installing the project, it may be because your RunUO requires an update.
 For the most part, I have tried to keep the project backward compatible, but some things do get missed from time to time.
-The recommended RunUO version to use is 2.3 with .NET Framework 4.0 support, the older the shard, the less compatible it will be.
-Vita-Nex: Core was initially developed to target RunUO 2.2 (REV 1072), so there should only be one or two differences to resolve.
+The recommended RunUO version to use is 2.7 with .NET Framework 4.0 support, the older the shard, the less compatible it will be.
 It is recommended to update RunUO to work with the project, rather than update the project to fix the errors, this will ensure the 
 project is consistent and stable.
 

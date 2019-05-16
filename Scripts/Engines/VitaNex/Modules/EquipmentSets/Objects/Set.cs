@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -22,9 +22,10 @@ using VitaNex.Network;
 
 namespace VitaNex.Modules.EquipmentSets
 {
-	public abstract class EquipmentSet : PropertyObject, IEnumerable<EquipmentSetPart>
+	public abstract class EquipmentSet : IEnumerable<EquipmentSetPart>
 	{
-		public static Item[] GenerateParts<TSet>() where TSet : EquipmentSet
+		public static Item[] GenerateParts<TSet>()
+			where TSet : EquipmentSet
 		{
 			return GenerateParts(typeof(TSet));
 		}
@@ -41,32 +42,20 @@ namespace VitaNex.Modules.EquipmentSets
 			return new Item[0];
 		}
 
-		private readonly List<Mobile> _ActiveOwners = new List<Mobile>();
-
-		public List<Mobile> ActiveOwners { get { return _ActiveOwners; } }
+		public List<Mobile> ActiveOwners { get; private set; }
 
 		public List<EquipmentSetPart> Parts { get; protected set; }
 		public List<EquipmentSetMod> Mods { get; protected set; }
 
 		public EquipmentSetPart this[int index] { get { return Parts[index]; } set { Parts[index] = value; } }
 
-		[CommandProperty(EquipmentSets.Access)]
 		public int Count { get { return Parts.Count; } }
 
-		[CommandProperty(EquipmentSets.Access)]
 		public string Name { get; set; }
 
-		[CommandProperty(EquipmentSets.Access)]
 		public bool Display { get; set; }
-
-		[CommandProperty(EquipmentSets.Access)]
 		public bool DisplayParts { get; set; }
-
-		[CommandProperty(EquipmentSets.Access)]
 		public bool DisplayMods { get; set; }
-
-		[CommandProperty(EquipmentSets.Access)]
-		public bool Valid { get { return Validate(); } }
 
 		public EquipmentSet(
 			string name,
@@ -76,23 +65,17 @@ namespace VitaNex.Modules.EquipmentSets
 			IEnumerable<EquipmentSetPart> parts = null,
 			IEnumerable<EquipmentSetMod> mods = null)
 		{
+			ActiveOwners = new List<Mobile>();
+
 			Name = name;
+
 			Display = display;
 			DisplayParts = displayParts;
 			DisplayMods = displayMods;
-			Parts = parts != null ? new List<EquipmentSetPart>(parts) : new List<EquipmentSetPart>();
-			Mods = mods != null ? new List<EquipmentSetMod>(mods) : new List<EquipmentSetMod>();
+
+			Parts = parts.Ensure().ToList();
+			Mods = mods.Ensure().ToList();
 		}
-
-		public EquipmentSet(GenericReader reader)
-			: base(reader)
-		{ }
-
-		public override void Clear()
-		{ }
-
-		public override void Reset()
-		{ }
 
 		IEnumerator IEnumerable.GetEnumerator()
 		{
@@ -146,12 +129,29 @@ namespace VitaNex.Modules.EquipmentSets
 
 		public bool HasPartTypeOf(Type type)
 		{
-			return Parts.Any(part => part.Valid && part.IsTypeOf(type));
+			return Parts.Exists(part => part.IsTypeOf(type));
+		}
+
+		public int CountEquippedParts(Mobile m)
+		{
+			var count = 0;
+
+			foreach (var part in Parts)
+			{
+				Item item;
+
+				if (part.IsEquipped(m, out item))
+				{
+					++count;
+				}
+			}
+
+			return count;
 		}
 
 		public IEnumerable<Tuple<EquipmentSetPart, Item>> FindEquippedParts(Mobile m)
 		{
-			foreach (var part in Parts.Where(p => p.Valid))
+			foreach (var part in Parts)
 			{
 				Item item;
 
@@ -169,7 +169,7 @@ namespace VitaNex.Modules.EquipmentSets
 
 		public IEnumerable<EquipmentSetMod> FindAvailableMods(Mobile m, EquipmentSetPart[] equipped)
 		{
-			return Mods.Where(mod => mod.Valid && equipped.Length >= mod.PartsRequired);
+			return Mods.Where(mod => equipped.Length >= mod.PartsRequired);
 		}
 
 		public EquipmentSetMod[] GetAvailableMods(Mobile m, EquipmentSetPart[] equipped)
@@ -177,20 +177,27 @@ namespace VitaNex.Modules.EquipmentSets
 			return FindAvailableMods(m, equipped).ToArray();
 		}
 
+		public Item GenerateRandomPart()
+		{
+			var p = Parts.GetRandom();
+
+			return p != null ? p.CreateRandomPart() : null;
+		}
+
 		public Item[] GenerateParts()
 		{
-			return Parts.Select(part => part.CreateInstanceOfPart()).Not(item => item == null || item.Deleted).ToArray();
+			return Parts.SelectMany(part => part.CreateParts()).Not(item => item == null || item.Deleted).ToArray();
 		}
 
 		public void Invalidate(Mobile m, Item item)
 		{
-			int totalActive = 0;
+			var totalActive = 0;
 
-			Type type = item.GetType();
+			var type = item.GetType();
 			var changedPart = Tuple.Create(Parts.FirstOrDefault(p => p.IsTypeOf(type)), item);
 			var equippedParts = GetEquippedParts(m);
 
-			foreach (EquipmentSetMod mod in Mods.Where(sm => sm.Valid))
+			foreach (var mod in Mods)
 			{
 				if (mod.IsActive(m))
 				{
@@ -201,7 +208,7 @@ namespace VitaNex.Modules.EquipmentSets
 						--totalActive;
 					}
 				}
-				else
+				else if (mod.CheckExpansion())
 				{
 					if (equippedParts.Length >= mod.PartsRequired && Activate(m, equippedParts, changedPart, mod))
 					{
@@ -216,21 +223,25 @@ namespace VitaNex.Modules.EquipmentSets
 			}
 
 			SetActiveOwner(m, totalActive > 0);
-			InvalidateAllProperties(m, equippedParts.Select(t => t.Item2).ToArray(), changedPart.Item2);
+
+			InvalidateAllProperties(m, equippedParts.Select(t => t.Item2), changedPart.Item2);
+
+			m.UpdateResistances();
+			m.UpdateSkillMods();
 		}
 
-		public void InvalidateAllProperties(Mobile m, Item[] equipped, Item changed)
+		public void InvalidateAllProperties(Mobile m, IEnumerable<Item> equipped, Item changed)
 		{
-			if (m == null || m.Deleted || m.Map == null || m.Map == Map.Internal)
+			if (World.Loading || World.Saving || m == null || m.Deleted || m.Map == null || m.Map == Map.Internal)
 			{
 				return;
 			}
 
 			m.InvalidateProperties();
 
-			if (equipped != null && equipped.Length > 0)
+			if (equipped != null)
 			{
-				foreach (Item item in equipped.Where(item => item != changed))
+				foreach (var item in equipped.Where(item => item != changed))
 				{
 					InvalidateItemProperties(item);
 				}
@@ -244,10 +255,13 @@ namespace VitaNex.Modules.EquipmentSets
 
 		public void InvalidateItemProperties(Item item)
 		{
-			if (item != null && !item.Deleted)
+			if (World.Loading || World.Saving || item == null || item.Deleted)
 			{
-				item.InvalidateProperties();
+				return;
 			}
+
+			item.ClearProperties();
+			item.InvalidateProperties();
 		}
 
 		private void SetActiveOwner(Mobile m, bool state)
@@ -262,122 +276,64 @@ namespace VitaNex.Modules.EquipmentSets
 			}
 		}
 
-		public virtual bool Validate()
-		{
-			return Mods != null && !String.IsNullOrWhiteSpace(Name);
-		}
-
 		public bool Activate(
-			Mobile m, Tuple<EquipmentSetPart, Item>[] equipped, Tuple<EquipmentSetPart, Item> added, EquipmentSetMod mod)
+			Mobile m,
+			Tuple<EquipmentSetPart, Item>[] equipped,
+			Tuple<EquipmentSetPart, Item> added,
+			EquipmentSetMod mod)
 		{
 			return OnActivate(m, equipped, added, mod) && mod.Activate(m, equipped);
 		}
 
 		public bool Deactivate(
-			Mobile m, Tuple<EquipmentSetPart, Item>[] equipped, Tuple<EquipmentSetPart, Item> added, EquipmentSetMod mod)
+			Mobile m,
+			Tuple<EquipmentSetPart, Item>[] equipped,
+			Tuple<EquipmentSetPart, Item> added,
+			EquipmentSetMod mod)
 		{
 			return OnDeactivate(m, equipped, added, mod) && mod.Deactivate(m, equipped);
 		}
 
 		protected virtual bool OnActivate(
-			Mobile m, Tuple<EquipmentSetPart, Item>[] equipped, Tuple<EquipmentSetPart, Item> added, EquipmentSetMod mod)
+			Mobile m,
+			Tuple<EquipmentSetPart, Item>[] equipped,
+			Tuple<EquipmentSetPart, Item> added,
+			EquipmentSetMod mod)
 		{
 			return m != null && !m.Deleted && equipped != null && mod != null && !mod.IsActive(m);
 		}
 
 		protected virtual bool OnDeactivate(
-			Mobile m, Tuple<EquipmentSetPart, Item>[] equipped, Tuple<EquipmentSetPart, Item> removed, EquipmentSetMod mod)
+			Mobile m,
+			Tuple<EquipmentSetPart, Item>[] equipped,
+			Tuple<EquipmentSetPart, Item> removed,
+			EquipmentSetMod mod)
 		{
 			return m != null && !m.Deleted && equipped != null && mod != null && mod.IsActive(m);
 		}
 
 		public virtual void GetProperties(Mobile viewer, ExtendedOPL list, bool equipped)
 		{
+			list.Add(String.Empty);
+
+			var name = Name.ToUpperWords();
+			var count = Parts.Count;
+
 			if (!equipped)
 			{
-				list.Add(
-					"{0} [{1:#,0}]".WrapUOHtmlColor(EquipmentSets.CMOptions.SetNameColorRaw),
-					Name.ToUpperWords(),
-					Parts.Count(p => p.Valid));
+				list.Add("{0} [{1:#,0}]".WrapUOHtmlColor(EquipmentSets.CMOptions.SetNameColorRaw), name, count);
 			}
 			else
 			{
-				list.Add(
-					"{0} [{1:#,0} / {2:#,0}]".WrapUOHtmlColor(EquipmentSets.CMOptions.SetNameColorRaw),
-					Name.ToUpperWords(),
-					GetEquippedParts(viewer).Length,
-					Parts.Count(p => p.Valid));
+				var cur = CountEquippedParts(viewer);
+
+				list.Add("{0} [{1:#,0} / {2:#,0}]".WrapUOHtmlColor(EquipmentSets.CMOptions.SetNameColorRaw), name, cur, count);
 			}
 		}
 
 		public override string ToString()
 		{
-			return String.Format("{0}", Name);
-		}
-
-		public override void Serialize(GenericWriter writer)
-		{
-			base.Serialize(writer);
-
-			int version = writer.SetVersion(0);
-
-			switch (version)
-			{
-				case 0:
-					{
-						writer.Write(Name);
-						writer.Write(Display);
-						writer.Write(DisplayParts);
-						writer.Write(DisplayMods);
-
-						writer.WriteList(
-							Parts,
-							p => writer.WriteType(
-								p,
-								t =>
-								{
-									if (t != null)
-									{
-										p.Serialize(writer);
-									}
-								}));
-
-						writer.WriteList(
-							Mods,
-							m => writer.WriteType(
-								m,
-								t =>
-								{
-									if (t != null)
-									{
-										m.Serialize(writer);
-									}
-								}));
-					}
-					break;
-			}
-		}
-
-		public override void Deserialize(GenericReader reader)
-		{
-			base.Deserialize(reader);
-
-			int version = reader.ReadInt();
-
-			switch (version)
-			{
-				case 0:
-					{
-						Name = reader.ReadString();
-						Display = reader.ReadBool();
-						DisplayParts = reader.ReadBool();
-						DisplayMods = reader.ReadBool();
-
-						Parts = reader.ReadList(() => reader.ReadTypeCreate<EquipmentSetPart>(reader));
-						Mods = reader.ReadList(() => reader.ReadTypeCreate<EquipmentSetMod>(reader));
-					}
-					break;
-			}
+			return Name;
 		}
 	}
 }

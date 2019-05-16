@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -29,22 +29,28 @@ namespace VitaNex.Modules.AutoPvP
 		public virtual int Battles { get { return AutoPvP.Battles.Count; } }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int BattlesInternal { get { return AutoPvP.GetBattles(PvPBattleState.Internal).Count; } }
+		public virtual int BattlesInternal { get { return AutoPvP.CountBattles(PvPBattleState.Internal); } }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int BattlesEnded { get { return AutoPvP.GetBattles(PvPBattleState.Ended).Count; } }
+		public virtual int BattlesEnded { get { return AutoPvP.CountBattles(PvPBattleState.Ended); } }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int BattlesPreparing { get { return AutoPvP.GetBattles(PvPBattleState.Preparing).Count; } }
+		public virtual int BattlesPreparing { get { return AutoPvP.CountBattles(PvPBattleState.Preparing); } }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int BattlesQueueing { get { return AutoPvP.GetBattles(PvPBattleState.Queueing).Count; } }
+		public virtual int BattlesQueueing { get { return AutoPvP.CountBattles(PvPBattleState.Queueing); } }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int BattlesRunning { get { return AutoPvP.GetBattles(PvPBattleState.Running).Count; } }
+		public virtual int BattlesRunning { get { return AutoPvP.CountBattles(PvPBattleState.Running); } }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int Participants { get { return AutoPvP.GetParticipants().Count; } }
+		public virtual int Participants { get { return AutoPvP.TotalParticipants(); } }
+
+		[CommandProperty(AutoPvP.Access)]
+		public virtual int Spectators { get { return AutoPvP.TotalSpectators(); } }
+
+		[CommandProperty(AutoPvP.Access)]
+		public virtual int Queueing { get { return AutoPvP.TotalQueued(); } }
 
 		[CommandProperty(AutoPvP.Access)]
 		public virtual int Profiles { get { return AutoPvP.Profiles.Count; } }
@@ -59,22 +65,22 @@ namespace VitaNex.Modules.AutoPvP
 			: base(reader)
 		{ }
 
+		public override string ToString()
+		{
+			return "View Statistics";
+		}
+
 		public override void Clear()
 		{ }
 
 		public override void Reset()
 		{ }
 
-		public override string ToString()
-		{
-			return "View Statistics";
-		}
-
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
@@ -87,7 +93,7 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{

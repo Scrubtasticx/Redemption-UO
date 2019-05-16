@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -11,6 +11,7 @@
 
 #region References
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 using Server;
@@ -19,11 +20,34 @@ using Server;
 namespace VitaNex.Modules.AutoPvP
 {
 	[PropertyObject]
-	public abstract class PvPBattleRestrictionsBase<TKey> : PropertyObject
+	public abstract class PvPBattleRestrictionsBase<TKey> : PropertyObject, IEnumerable<TKey>
 	{
+		public static void SetFlag(ref ulong flags, ulong f, bool v)
+		{
+			if (v)
+			{
+				flags |= f;
+			}
+			else
+			{
+				flags &= ~f;
+			}
+		}
+
+		public static bool GetFlag(ulong flags, ulong f)
+		{
+			return (flags & f) != 0;
+		}
+
 		private Dictionary<TKey, bool> _List = new Dictionary<TKey, bool>();
 
-		public virtual Dictionary<TKey, bool> List { get { return _List; } set { _List = value ?? new Dictionary<TKey, bool>(); } }
+		public virtual Dictionary<TKey, bool> List
+		{
+			get { return _List; }
+			set { _List = value ?? new Dictionary<TKey, bool>(); }
+		}
+
+		public bool this[TKey key] { get { return IsRestricted(key); } set { SetRestricted(key, value); } }
 
 		public PvPBattleRestrictionsBase()
 		{
@@ -38,18 +62,12 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void Invert()
 		{
-			foreach (var t in _List.Keys)
-			{
-				_List[t] = !_List[t];
-			}
+			_List.Keys.ForEach(t => _List[t] = !_List[t]);
 		}
 
 		public virtual void Reset(bool val)
 		{
-			foreach (var t in _List.Keys)
-			{
-				_List[t] = val;
-			}
+			_List.Keys.ForEach(t => _List[t] = val);
 		}
 
 		public virtual bool Remove(TKey key)
@@ -71,7 +89,7 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			if (key != null)
 			{
-				_List.AddOrReplace(key, val);
+				_List[key] = val;
 			}
 		}
 
@@ -80,11 +98,21 @@ namespace VitaNex.Modules.AutoPvP
 			return key != null && _List.ContainsKey(key) && _List[key];
 		}
 
+		public IEnumerator<TKey> GetEnumerator()
+		{
+			return _List.Keys.GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
+		}
+
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
@@ -98,7 +126,7 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -62,7 +62,7 @@ namespace VitaNex.Items
 				list.Add(1050043, Crafter.RawName);
 			}
 
-			StringBuilder props = new StringBuilder();
+			var props = new StringBuilder();
 
 			GetProperties(props);
 
@@ -79,15 +79,30 @@ namespace VitaNex.Items
 			int quality,
 			bool makersMark,
 			Mobile m,
-			CraftSystem craftSystem,
+			CraftSystem craft,
 			Type typeRes,
+#if ServUO
+			ITool tool,
+#else
 			BaseTool tool,
-			CraftItem craftItem,
+#endif
+			CraftItem item,
 			int resHue)
 		{
 			if (makersMark)
 			{
 				Crafter = m;
+			}
+
+			var context = craft.GetContext(m);
+
+			if (context != null && context.DoNotColor)
+			{
+				Hue = 0;
+			}
+			else if (resHue > 0)
+			{
+				Hue = resHue;
 			}
 
 			return quality;

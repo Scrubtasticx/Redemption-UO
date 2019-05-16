@@ -3,13 +3,14 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
+using System;
 using System.Collections.Generic;
 #endregion
 
@@ -17,9 +18,11 @@ namespace VitaNex.SuperGumps
 {
 	public abstract partial class SuperGump
 	{
-		public List<SuperGump> Linked { get; private set; }
+		private List<SuperGump> _Linked;
 
-		public bool IsLinked { get { return (Linked != null && Linked.Count > 0); } }
+		public List<SuperGump> Linked { get { return _Linked; } protected set { _Linked = value; } }
+
+		public bool IsLinked { get { return Linked.Count > 0; } }
 
 		public virtual void Link(SuperGump gump)
 		{
@@ -28,10 +31,7 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			if (!Linked.Contains(gump))
-			{
-				Linked.Add(gump);
-			}
+			Linked.AddOrReplace(gump);
 
 			if (!gump.Linked.Contains(this))
 			{
@@ -46,10 +46,7 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			if (Linked.Contains(gump))
-			{
-				Linked.Remove(gump);
-			}
+			Linked.Remove(gump);
 
 			if (gump.Linked.Contains(this))
 			{

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -27,7 +27,8 @@ namespace VitaNex.FX
 	{
 		None = 0,
 		Random,
-		FirePentagram,
+
+		FirePentagram
 		//-FireSpiral
 	}
 
@@ -45,7 +46,7 @@ namespace VitaNex.FX
 						return;
 					}
 
-					Mobile m = ce.Mobile;
+					var m = ce.Mobile;
 
 					if (m.Hidden)
 					{
@@ -69,7 +70,7 @@ namespace VitaNex.FX
 						return;
 					}
 
-					Mobile m = ce.Mobile;
+					var m = ce.Mobile;
 					SpecialFX effect;
 					int range, speed, repeat, reverse;
 
@@ -103,8 +104,12 @@ namespace VitaNex.FX
 					repeat = Math.Max(0, Math.Min(100, repeat));
 					reverse = Math.Max(0, Math.Min(1, reverse));
 
-					BaseSpecialEffect e = effect.CreateInstance(
-						m.Location, m.Map, range, repeat, TimeSpan.FromMilliseconds(1000 - ((speed - 1) * 100)));
+					var e = effect.CreateInstance(
+						m.Location,
+						m.Map,
+						range,
+						repeat,
+						TimeSpan.FromMilliseconds(1000 - ((speed - 1) * 100)));
 
 					if (e != null)
 					{
@@ -134,20 +139,20 @@ namespace VitaNex.FX
 					return null;
 				case SpecialFX.FirePentagram:
 					return new FirePentagramEffect(start, map, range, repeat, interval, effectHandler, callback);
-					/*case SpecialFX.FireSpiral:
+				/*case SpecialFX.FireSpiral:
 					return new FireSpiralEffect(start, map, range, repeat, interval, effectHandler, callback);*/
 				default:
+				{
+					var rfx = (SpecialFX[])Enum.GetValues(typeof(SpecialFX));
+
+					do
 					{
-						var rfx = (SpecialFX[])Enum.GetValues(typeof(SpecialFX));
-
-						do
-						{
-							type = rfx.GetRandom();
-						}
-						while (type == SpecialFX.Random || type == SpecialFX.None);
-
-						return CreateInstance(type, start, map, range, repeat, interval, effectHandler, callback);
+						type = rfx.GetRandom();
 					}
+					while (type == SpecialFX.Random || type == SpecialFX.None);
+
+					return CreateInstance(type, start, map, range, repeat, interval, effectHandler, callback);
+				}
 			}
 		}
 	}
@@ -210,7 +215,7 @@ namespace VitaNex.FX
 
 		private const double Section = 72;
 
-		private static readonly double[][] _Lines = new[]
+		private static readonly double[][] _Lines =
 		{
 			new[] {0, Section * 2}, new[] {Section * 2, Section * 4}, new[] {Section * 4, Section}, new[] {Section, Section * 3},
 			new[] {Section * 3, 0}
@@ -225,11 +230,11 @@ namespace VitaNex.FX
 			_Lines.For(
 				(i, list) =>
 				{
-					Point3D start = Start.Clone3D(
+					var start = Start.Clone3D(
 						(int)Math.Round(Range * Math.Sin(Geo.DegreesToRadians(list[0]))),
 						(int)Math.Round(Range * Math.Cos(Geo.DegreesToRadians(list[0]))));
 
-					Point3D end = Start.Clone3D(
+					var end = Start.Clone3D(
 						(int)Math.Round(Range * Math.Sin(Geo.DegreesToRadians(list[1]))),
 						(int)Math.Round(Range * Math.Cos(Geo.DegreesToRadians(list[1]))));
 

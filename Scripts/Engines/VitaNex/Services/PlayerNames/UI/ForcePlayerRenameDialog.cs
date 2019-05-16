@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -27,7 +27,7 @@ namespace VitaNex
 {
 	public class ForcePlayerRenameDialog : InputDialogGump
 	{
-		public ForcePlayerRenameDialog(PlayerMobile user, string input = null)
+		public ForcePlayerRenameDialog(Mobile user, string input = null)
 			: base(user, input: input, limit: 16)
 		{
 			CanClose = false;
@@ -50,8 +50,15 @@ namespace VitaNex
 
 		protected override void OnAccept(GumpButton button)
 		{
-			if (String.IsNullOrWhiteSpace(InputText) ||
-				!NameVerification.Validate(InputText, 2, 16, true, false, true, 1, NameVerification.SpaceDashPeriodQuote))
+			if (String.IsNullOrWhiteSpace(InputText) || !NameVerification.Validate(
+					InputText,
+					2,
+					20,
+					true,
+					false,
+					true,
+					1,
+					NameVerification.SpaceDashPeriodQuote))
 			{
 				Html = ("The name \"" + InputText + "\" is invalid.\n\n").WrapUOHtmlColor(Color.OrangeRed, HtmlColor) +
 					   "It appears that another character is already using the name \"" + //
@@ -64,8 +71,10 @@ namespace VitaNex
 				return;
 			}
 
-			if (InputText == User.RawName ||
-				PlayerNames.FindPlayers(InputText, p => p != User && p.GameTime > User.GameTime).Any())
+			if (InputText == User.RawName || PlayerNames.FindPlayers(
+															InputText,
+															p => p != User && p.GameTime > ((PlayerMobile)User).GameTime)
+														.Any())
 			{
 				Html = "It appears that another character is already using the name \"" + //
 					   InputText.WrapUOHtmlColor(Color.LawnGreen, HtmlColor) + "\"!\n\n" + //
@@ -79,7 +88,7 @@ namespace VitaNex
 
 			User.RawName = InputText;
 
-			PlayerNames.Register(User);
+			PlayerNames.Register((PlayerMobile)User);
 
 			base.OnAccept(button);
 		}

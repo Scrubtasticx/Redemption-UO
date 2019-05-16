@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,15 +12,16 @@
 #region References
 using System;
 
+using Server;
 using Server.Mobiles;
 #endregion
 
-namespace Server.Misc
+namespace VitaNex.Modules.AntiAdverts
 {
 	public sealed class AntiAdvertsReport : IEquatable<AntiAdvertsReport>
 	{
 		public DateTime Date { get; private set; }
-		public PlayerMobile Mobile { get; private set; }
+		public Mobile Mobile { get; private set; }
 
 		public string Report { get; set; }
 		public string Speech { get; set; }
@@ -29,7 +30,13 @@ namespace Server.Misc
 		public bool Viewed { get; set; }
 
 		public AntiAdvertsReport(
-			DateTime date, PlayerMobile m, string report, string speech, bool jailed, bool banned, bool viewed = false)
+			DateTime date,
+			Mobile m,
+			string report,
+			string speech,
+			bool jailed,
+			bool banned,
+			bool viewed = false)
 		{
 			Date = date;
 			Mobile = m;
@@ -47,14 +54,18 @@ namespace Server.Misc
 
 		public override string ToString()
 		{
-			return String.Format("[{0}] {1}: {2}", Date.ToSimpleString("t@h:m@ m-d"), Mobile.RawName, Report);
+			return String.Format(
+				"[{0}] {1}: {2}",
+				Date.ToSimpleString("t@h:m@ m-d"),
+				Mobile == null ? "-null-" : Mobile.RawName,
+				Report);
 		}
 
 		public override int GetHashCode()
 		{
 			unchecked
 			{
-				int hashCode = (Mobile != null ? Mobile.Serial.Value : 0);
+				var hashCode = (Mobile != null ? Mobile.Serial.Value : 0);
 				hashCode = (hashCode * 397) ^ Date.GetHashCode();
 				hashCode = (hashCode * 397) ^ (Speech != null ? Speech.GetHashCode() : 0);
 				hashCode = (hashCode * 397) ^ (Report != null ? Report.GetHashCode() : 0);
@@ -66,14 +77,13 @@ namespace Server.Misc
 
 		public override bool Equals(object obj)
 		{
-			return !ReferenceEquals(null, obj) && (obj is AntiAdvertsReport && Equals((AntiAdvertsReport)obj));
+			return obj is AntiAdvertsReport && Equals((AntiAdvertsReport)obj);
 		}
 
 		public bool Equals(AntiAdvertsReport other)
 		{
-			return !ReferenceEquals(other, null) && Equals(Mobile, other.Mobile) && Equals(Date, other.Date) &&
-				   Equals(Jailed, other.Jailed) && Equals(Banned, other.Banned) && String.Equals(Speech, other.Speech) &&
-				   String.Equals(Report, other.Report);
+			return !ReferenceEquals(other, null) && Mobile == other.Mobile && Date == other.Date && Jailed == other.Jailed &&
+				   Banned == other.Banned && Speech == other.Speech && Report == other.Report;
 		}
 
 		public void Serialize(GenericWriter writer)
@@ -102,24 +112,14 @@ namespace Server.Misc
 			Banned = reader.ReadBool();
 		}
 
-		public static bool operator ==(AntiAdvertsReport left, AntiAdvertsReport right)
+		public static bool operator ==(AntiAdvertsReport l, AntiAdvertsReport r)
 		{
-			if (ReferenceEquals(left, null))
-			{
-				return ReferenceEquals(right, null);
-			}
-
-			return left.Equals(right);
+			return ReferenceEquals(l, null) ? ReferenceEquals(r, null) : l.Equals(r);
 		}
 
-		public static bool operator !=(AntiAdvertsReport left, AntiAdvertsReport right)
+		public static bool operator !=(AntiAdvertsReport l, AntiAdvertsReport r)
 		{
-			if (ReferenceEquals(left, null))
-			{
-				return !ReferenceEquals(right, null);
-			}
-
-			return !left.Equals(right);
+			return ReferenceEquals(l, null) ? !ReferenceEquals(r, null) : !l.Equals(r);
 		}
 	}
 }

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -26,6 +26,7 @@ namespace VitaNex.Schedules
 		Thursday = 0x010,
 		Friday = 0x020,
 		Saturday = 0x040,
-		All = Sunday | Monday | Tuesday | Wednesday | Thursday | Friday | Saturday
+
+		All = Int16.MaxValue
 	}
 }

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -15,6 +15,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 
+using Server;
 using Server.Gumps;
 using Server.Mobiles;
 
@@ -25,18 +26,22 @@ namespace VitaNex.Modules.Voting
 {
 	public sealed class VoteProfileHistoryGump : HtmlPanelGump<VoteProfile>
 	{
+		public DateTime? HistoryDate { get; set; }
+		public bool UseConfirmDialog { get; set; }
+		public bool TechnicalView { get; set; }
+
 		public VoteProfileHistoryGump(
-			PlayerMobile user, VoteProfile profile, Gump parent = null, bool useConfirm = true, DateTime? when = null)
+			Mobile user,
+			VoteProfile profile,
+			Gump parent = null,
+			bool useConfirm = true,
+			DateTime? when = null)
 			: base(user, parent, emptyText: "No profile selected.", title: "Vote Profile History", selected: profile)
 		{
 			HtmlColor = Color.SkyBlue;
 			UseConfirmDialog = useConfirm;
 			HistoryDate = when;
 		}
-
-		public DateTime? HistoryDate { get; set; }
-		public bool UseConfirmDialog { get; set; }
-		public bool TechnicalView { get; set; }
 
 		protected override void Compile()
 		{
@@ -47,7 +52,7 @@ namespace VitaNex.Modules.Voting
 				return;
 			}
 
-			Html = String.Format("<basefont color=#{0:X6}>", HtmlColor.ToArgb());
+			Html = String.Format("<basefont color=#{0:X6}>", HtmlColor.ToRgb());
 
 			if (HistoryDate != null && HistoryDate.Value <= DateTime.UtcNow)
 			{
@@ -56,7 +61,7 @@ namespace VitaNex.Modules.Voting
 					Selected.Owner.RawName,
 					HistoryDate.Value.ToSimpleString(Voting.CMOptions.DateFormat));
 
-				Html += String.Format("<big>Showing up to 500 entries...</big>\n\n");
+				Html += "<big>Showing up to 500 entries...</big>\n\n";
 
 				Html += String.Join("\n", Selected.GetHistory(HistoryDate.Value, 500).Select(e => e.ToHtmlString(TechnicalView)));
 			}
@@ -64,7 +69,7 @@ namespace VitaNex.Modules.Voting
 			{
 				Html += String.Format("Viewing Recent History for {0}\n\n", Selected.Owner.RawName);
 
-				Html += String.Format("<big>Showing up to 500 entries...</big>\n\n");
+				Html += "<big>Showing up to 500 entries...</big>\n\n";
 
 				Html += String.Join("\n", Selected.GetHistory(500).Select(e => e.ToHtmlString(TechnicalView)));
 			}
@@ -162,7 +167,13 @@ namespace VitaNex.Modules.Voting
 		{
 			if (Selected == null || Selected.Deleted)
 			{
-				Selected = Voting.EnsureProfile(User);
+				Selected = Voting.EnsureProfile(User as PlayerMobile);
+			}
+
+			if (Selected == null)
+			{
+				Refresh(true);
+				return;
 			}
 
 			if (UseConfirmDialog)
@@ -171,8 +182,8 @@ namespace VitaNex.Modules.Voting
 					new ConfirmDialogGump(User, Refresh())
 					{
 						Title = "Clear Profile History?",
-						Html =
-							"All data associated with the profile history will be lost.\nThis action can not be reversed!\nDo you want to continue?",
+						Html = "All data associated with the profile history will be lost.\n" +
+							   "This action can not be reversed!\nDo you want to continue?",
 						AcceptHandler = ConfirmClearHistory
 					});
 			}
@@ -187,7 +198,13 @@ namespace VitaNex.Modules.Voting
 		{
 			if (Selected == null || Selected.Deleted)
 			{
-				Selected = Voting.EnsureProfile(User);
+				Selected = Voting.EnsureProfile(User as PlayerMobile);
+			}
+
+			if (Selected == null)
+			{
+				Refresh(true);
+				return;
 			}
 
 			if (UseConfirmDialog)
@@ -196,8 +213,8 @@ namespace VitaNex.Modules.Voting
 					new ConfirmDialogGump(User, Refresh())
 					{
 						Title = "Delete Profile?",
-						Html =
-							"All data associated with this profile will be deleted.\nThis action can not be reversed!\nDo you want to continue?",
+						Html = "All data associated with this profile will be deleted.\n" +
+							   "This action can not be reversed!\nDo you want to continue?",
 						AcceptHandler = ConfirmDeleteProfile
 					});
 			}
@@ -235,7 +252,7 @@ namespace VitaNex.Modules.Voting
 				return;
 			}
 
-			StringBuilder sb = VoteGumpUtility.GetHelpText(User);
+			var sb = VoteGumpUtility.GetHelpText(User);
 			Send(
 				new HtmlPanelGump<StringBuilder>(User, Hide(true))
 				{

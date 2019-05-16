@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,25 +12,29 @@
 #region References
 using System.Collections.Generic;
 
-using Server.Mobiles;
-
-using VitaNex;
-using VitaNex.SuperGumps;
+using Server;
 #endregion
 
-namespace Server.Misc
+namespace VitaNex.Modules.AntiAdverts
 {
-	[CoreModule("Anti Adverts", "1.0.0.0")]
+	[CoreModule("Anti Adverts", "1.0.0.2")]
 	public static partial class AntiAdverts
 	{
 		static AntiAdverts()
 		{
+			CMOptions = new AntiAdvertsOptions();
+
 			Reports = new List<AntiAdvertsReport>(100);
 		}
 
 		private static void CMConfig()
 		{
 			EventSink.Speech += OnSpeech;
+		}
+
+		private static void CMInvoke()
+		{
+			CommandUtility.Register("AntiAds", Access, e => new AntiAvertsReportsGump(e.Mobile).Send());
 		}
 
 		private static void CMEnabled()
@@ -41,20 +45,6 @@ namespace Server.Misc
 		private static void CMDisabled()
 		{
 			EventSink.Speech -= OnSpeech;
-		}
-
-		private static void CMInvoke()
-		{
-			CommandUtility.Register(
-				"AntiAds",
-				Access,
-				e =>
-				{
-					if (e.Mobile is PlayerMobile)
-					{
-						SuperGump.Send(new AntiAvertsReportsGump((PlayerMobile)e.Mobile));
-					}
-				});
 		}
 
 		private static void CMSave()

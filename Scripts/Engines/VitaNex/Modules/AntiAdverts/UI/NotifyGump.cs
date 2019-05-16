@@ -3,30 +3,30 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
-using Server.Mobiles;
+using Server;
 
 using VitaNex.Notify;
 #endregion
 
-namespace Server.Misc
+namespace VitaNex.Modules.AntiAdverts
 {
 	public sealed class AntiAdvertNotifyGump : NotifyGump
 	{
 		private static void InitSettings(NotifySettings settings)
 		{
-			settings.Name = "Advertising Reports";
 			settings.CanIgnore = true;
 			settings.Access = AntiAdverts.Access;
+			settings.Desc = "Advertising Reports";
 		}
 
-		public AntiAdvertNotifyGump(PlayerMobile user, string html)
+		public AntiAdvertNotifyGump(Mobile user, string html)
 			: base(user, html)
 		{ }
 	}

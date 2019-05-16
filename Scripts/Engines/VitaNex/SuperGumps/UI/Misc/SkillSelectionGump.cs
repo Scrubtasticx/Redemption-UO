@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -17,7 +17,6 @@ using System.Linq;
 
 using Server;
 using Server.Gumps;
-using Server.Mobiles;
 #endregion
 
 namespace VitaNex.SuperGumps.UI
@@ -37,7 +36,7 @@ namespace VitaNex.SuperGumps.UI
 		public List<SkillName> IgnoredSkills { get; set; }
 
 		public SkillSelectionGump(
-			PlayerMobile user,
+			Mobile user,
 			Gump parent = null,
 			int limit = 1,
 			Action<GumpButton> onAccept = null,
@@ -66,7 +65,7 @@ namespace VitaNex.SuperGumps.UI
 		{
 			List.Clear();
 
-			foreach (SkillName skill in _Skills.Where(skill => !IgnoredSkills.Contains(skill)))
+			foreach (var skill in _Skills.Where(skill => !IgnoredSkills.Contains(skill)))
 			{
 				List.Add(skill);
 			}
@@ -76,10 +75,10 @@ namespace VitaNex.SuperGumps.UI
 			List.Sort((a, b) => String.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal));
 		}
 
-		protected override sealed void CompileMenuOptions(MenuGumpOptions list)
+		protected sealed override void CompileMenuOptions(MenuGumpOptions list)
 		{ }
 
-		protected override sealed void ShowOptionMenu(GumpButton button)
+		protected sealed override void ShowOptionMenu(GumpButton button)
 		{
 			OnAccept(button);
 		}
@@ -118,14 +117,26 @@ namespace VitaNex.SuperGumps.UI
 				return;
 			}
 
-			layout.AddReplace("background/body/base", () => AddBackground(0, 55, 420, 330, 9270));
+			var sup = SupportsUltimaStore;
+			var ec = IsEnhancedClient;
+			var bgID = ec ? 83 : sup ? 40000 : 9270;
+
+			layout.Replace("background/body/base", () => AddBackground(0, 55, 420, 330, bgID));
 			layout.Remove("imagetiled/body/vsep/0");
 		}
 
 		protected override void CompileEntryLayout(
-			SuperGumpLayout layout, int length, int index, int pIndex, int yOffset, SkillName entry)
+			SuperGumpLayout layout,
+			int length,
+			int index,
+			int pIndex,
+			int yOffset,
+			SkillName entry)
 		{
-			int xOffset = 0;
+			var sup = SupportsUltimaStore;
+			var bgID = sup ? 40000 : 9270;
+
+			var xOffset = 0;
 
 			if (pIndex < EntriesPerPage - 20)
 			{
@@ -142,7 +153,7 @@ namespace VitaNex.SuperGumps.UI
 				yOffset = 70 + (pIndex - 20) * 30;
 			}
 
-			layout.AddReplace(
+			layout.Replace(
 				"check/list/select/" + index,
 				() => AddButton(
 					xOffset,
@@ -163,14 +174,13 @@ namespace VitaNex.SuperGumps.UI
 							}
 							else
 							{
-								Send(
-									new NoticeDialogGump(
-										User,
-										Refresh(true),
-										title: "Limit Reached",
-										html:
-											"You have selected the maximum of " + Limit +
-											" skills.\nIf you are happy with your selection, click the 'Okay' button."));
+								new NoticeDialogGump(User, Refresh(true))
+								{
+									Title = "Limit Reached",
+									Html = "You have selected the maximum of " + Limit +
+										   " skills.\nIf you are happy with your selection, click the 'Okay' button."
+								}.Send();
+
 								return;
 							}
 						}
@@ -185,25 +195,24 @@ namespace VitaNex.SuperGumps.UI
 					() =>
 					{
 						AddImageTiled(xOffset, yOffset, 128, 28, 3004);
-						AddImageTiled(4 + xOffset, 4 + yOffset, 120, 20, 9274);
+						AddImageTiled(4 + xOffset, 4 + yOffset, 120, 20, bgID + 4);
 					});
 			}
 			else
 			{
-				layout.Add("imagetiled/list/entry/" + index, () => AddImageTiled(xOffset, yOffset, 128, 28, 9274));
+				layout.Add("imagetiled/list/entry/" + index, () => AddImageTiled(xOffset, yOffset, 128, 28, bgID + 4));
 			}
 
 			layout.Add(
 				"html/list/entry/" + index,
-				() =>
-				AddHtml(
+				() => AddHtml(
 					4 + xOffset,
 					4 + yOffset,
 					120,
 					20,
 					String.Format(
 						"<center><big><basefont color=#{0:X6}>{1}</big></center>",
-						GetLabelHue(index, pIndex, entry),
+						(ushort)GetLabelHue(index, pIndex, entry),
 						GetLabelText(index, pIndex, entry)),
 					false,
 					false));
@@ -211,7 +220,7 @@ namespace VitaNex.SuperGumps.UI
 
 		protected override int GetLabelHue(int index, int pageIndex, SkillName entry)
 		{
-			return SelectedSkills.Contains(entry) ? Color.Cyan.ToArgb() : Color.White.ToArgb();
+			return SelectedSkills.Contains(entry) ? Color.Cyan.ToRgb() : Color.White.ToRgb();
 		}
 	}
 }

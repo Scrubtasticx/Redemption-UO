@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -27,11 +27,7 @@ namespace VitaNex.Items
 
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
 		public HauntedMomento Momento { get { return _Momento; } }
-
-		protected bool Clicked { get; set; }
-
-		public override Mobile Combatant { get { return null; } set { } }
-
+		
 		public override bool ClickTitle { get { return false; } }
 		public override bool AlwaysMurderer { get { return true; } }
 		public override bool BardImmune { get { return true; } }
@@ -59,6 +55,7 @@ namespace VitaNex.Items
 			Hue = 0x4001;
 			BaseSoundID = 0;
 
+			Hidden = true;
 			Blessed = true;
 			Tamable = false;
 			CanSwim = true;
@@ -86,17 +83,7 @@ namespace VitaNex.Items
 			SetResistance(ResistanceType.Physical, 100);
 			SetResistance(ResistanceType.Poison, 100);
 
-			foreach (Skill sk in Skills)
-			{
-				if (sk == null)
-				{
-					continue;
-				}
-
-				sk.SetCap(0);
-				sk.SetBase(0);
-				sk.Normalize();
-			}
+			this.SetAllSkills(0, 0);
 
 			ChangeBody();
 			OnThink();
@@ -150,7 +137,7 @@ namespace VitaNex.Items
 
 			PlaySound(1383);
 		}
-
+		
 		public override void OnThink()
 		{
 			base.OnThink();
@@ -162,7 +149,7 @@ namespace VitaNex.Items
 				return;
 			}
 
-			var parent = _Momento.RootParent as Mobile;
+			var parent = (Mobile)_Momento.RootParent;
 
 			if (parent.Deleted || parent.Map == null || parent.Map == Map.Internal)
 			{
@@ -170,28 +157,36 @@ namespace VitaNex.Items
 				return;
 			}
 
+			Hidden = true;
+
 			Home = parent.Location;
 			RangeHome = RangePerception;
 
-			Map map = parent.Map;
+			var map = parent.Map;
 
 			if (Map == null || Map == Map.Internal || Map != map || !InRange(parent, 20))
 			{
 				MoveToWorld(parent.GetRandomPoint3D(RangeHome + (RangeHome / 2)).GetWorldTop(map), map);
+
 				ChangeBody();
 			}
 
-			Direction to = parent.GetDirectionTo(this);
-			bool stop = (parent.InRange(this, RangeHome / 2)),
-				 hide = (IsBeingLookedAt(parent.Direction, to) || !parent.InRange(this, RangeHome + (RangeHome / 2)));
+			var to = parent.GetDirectionTo(this);
 
-			if (!hide && !Clicked)
+			var stop = (parent.InRange(this, RangeHome / 2));
+
+			if (parent is PlayerMobile)
 			{
-				Hidden = false;
-			}
-			else if (hide)
-			{
-				Hidden = true;
+				var hide = (IsBeingLookedAt(parent.Direction, to) || !parent.InRange(this, RangeHome + (RangeHome / 2)));
+
+				if (hide)
+				{
+					((PlayerMobile)parent).VisibilityList.AddOrReplace(this);
+				}
+				else
+				{
+					((PlayerMobile)parent).VisibilityList.Remove(this);
+				}
 			}
 
 			if (stop)
@@ -206,7 +201,7 @@ namespace VitaNex.Items
 
 			Movement.Offset(GetDirectionTo(Home), ref x, ref y);
 
-			Point3D p = new Point3D(x, y, z).GetWorldTop(map);
+			var p = new Point3D(x, y, z).GetWorldTop(map);
 
 			if (!map.CanFit(p, 16))
 			{
@@ -224,7 +219,14 @@ namespace VitaNex.Items
 		{
 			if (_Momento != null)
 			{
-				if (_Momento.Entity != null && _Momento.Entity == this)
+				var parent = _Momento.RootParent as Mobile;
+
+				if (parent is PlayerMobile)
+				{
+					((PlayerMobile)parent).VisibilityList.Remove(this);
+				}
+
+				if (_Momento.Entity == this)
 				{
 					_Momento.Entity = null;
 				}
@@ -253,59 +255,30 @@ namespace VitaNex.Items
 			return false;
 		}
 
-		public override bool CheckAttack(Mobile m)
-		{
-			return false;
-		}
-
-		public override void OnDoubleClick(Mobile from)
-		{
-			if (!Hidden && !Clicked)
-			{
-				Hidden = Clicked = true;
-
-				Timer.DelayCall(
-					TimeSpan.FromSeconds(Utility.RandomMinMax(10, 30)),
-					() =>
-					{
-						if (Hidden && Clicked)
-						{
-							Hidden = Clicked = false;
-						}
-					});
-			}
-		}
-
-		public override void OnSingleClick(Mobile from)
-		{
-			if (!Hidden && !Clicked)
-			{
-				Hidden = Clicked = true;
-
-				Timer.DelayCall(
-					TimeSpan.FromSeconds(Utility.RandomMinMax(10, 30)),
-					() =>
-					{
-						if (Hidden && Clicked)
-						{
-							Hidden = Clicked = false;
-						}
-					});
-			}
-		}
-
 		protected override bool OnMove(Direction d)
 		{
 			return true;
 		}
 
-		public override void AddNameProperties(ObjectPropertyList list)
+		public override bool OnMoveOver(Mobile m)
+		{
+			return true;
+		}
+
+		public override bool OnMoveOff(Mobile m)
+		{
+			return true;
+		}
+
+		public override bool CheckShove(Mobile shoved)
+		{
+			return true;
+		}
+
+		public override void OnDoubleClick(Mobile m)
 		{ }
 
-		public override void GetProperties(ObjectPropertyList list)
-		{ }
-
-		public override void GenerateLoot()
+		public override void OnSingleClick(Mobile m)
 		{ }
 
 		public override bool OnDragDrop(Mobile from, Item dropped)
@@ -317,24 +290,30 @@ namespace VitaNex.Items
 		{
 			return false;
 		}
-
+		
 		public override void OnStatsQuery(Mobile from)
+		{ }
+
+		public override void AddNameProperties(ObjectPropertyList list)
+		{ }
+
+		public override void GetProperties(ObjectPropertyList list)
+		{ }
+
+		public override void GenerateLoot()
 		{ }
 
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(1);
 
-			switch (version)
+			writer.Write(_Momento);
+
+			if (version < 1)
 			{
-				case 0:
-					{
-						writer.Write(_Momento);
-						writer.Write(Clicked);
-					}
-					break;
+				writer.Write(false);
 			}
 		}
 
@@ -342,16 +321,13 @@ namespace VitaNex.Items
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
-			switch (version)
+			_Momento = reader.ReadItem<HauntedMomento>();
+
+			if (version < 1)
 			{
-				case 0:
-					{
-						_Momento = reader.ReadItem<HauntedMomento>();
-						Clicked = reader.ReadBool();
-					}
-					break;
+				reader.ReadBool();
 			}
 		}
 	}
@@ -485,7 +461,7 @@ namespace VitaNex.Items
 
 		protected virtual void InvalidateEntity()
 		{
-			if (Map == null || Map == Map.Internal || !(RootParent is Mobile) || Parent is BankBox || ((Mobile)RootParent).Hidden)
+			if (Map == null || Map == Map.Internal || !(RootParent is Mobile) || Parent is BankBox)
 			{
 				if (Entity != null)
 				{
@@ -513,7 +489,7 @@ namespace VitaNex.Items
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
@@ -527,7 +503,7 @@ namespace VitaNex.Items
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{

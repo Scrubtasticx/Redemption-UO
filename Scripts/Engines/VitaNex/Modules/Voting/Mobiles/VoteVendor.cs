@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -22,7 +22,7 @@ namespace VitaNex.Modules.Voting
 	{
 		[Constructable]
 		public VoteVendor()
-			: base("the vote registrar", typeof(VoteToken), "Vote Tokens")
+			: base("the vote registrar", typeof(VoteToken), "Vote Tokens", "VT")
 		{ }
 
 		public VoteVendor(Serial serial)
@@ -31,20 +31,26 @@ namespace VitaNex.Modules.Voting
 
 		protected override void InitBuyInfo()
 		{
-			AddStock<RuneCodex>(250);
+			AddStock<ThrowableStinkBomb>(2);
+			AddStock<ThrowableCat>(2);
+			AddStock<ThrowableRock>(2);
+
 			AddStock<StrobeLantern>(100);
 
-			AddStock<ThrowableBomb>(1);
-			AddStock<ThrowableHealBomb>(1);
-			AddStock<ThrowableCureBomb>(1);
-			AddStock<ThrowableManaBomb>(1);
+			AddStock<BroadcastScroll>(1);
+			AddStock<BroadcastScroll_3Uses>(3);
+			AddStock<BroadcastScroll_5Uses>(5);
+			AddStock<BroadcastScroll_10Uses>(10);
+			AddStock<BroadcastScroll_30Uses>(30);
+			AddStock<BroadcastScroll_50Uses>(50);
+			AddStock<BroadcastScroll_100Uses>(100);
 		}
 
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
@@ -57,7 +63,7 @@ namespace VitaNex.Modules.Voting
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -52,7 +52,7 @@ namespace VitaNex
 				return;
 			}
 
-			string rName = FindRegisteredName(pm);
+			var rName = FindRegisteredName(pm);
 
 			if (!String.IsNullOrWhiteSpace(rName) && rName != pm.RawName)
 			{
@@ -90,7 +90,8 @@ namespace VitaNex
 
 		public static void ValidateSharedName(PlayerMobile m)
 		{
-			if (m != null && !CSOptions.NameSharing && FindPlayers(m.RawName, p => p != m && p.GameTime > m.GameTime).Any())
+			if (m != null && !CSOptions.NameSharing &&
+				FindPlayers(m.RawName, p => p != m && p.CreationTime < m.CreationTime).Any())
 			{
 				new ForcePlayerRenameDialog(m).Send();
 			}
@@ -130,7 +131,7 @@ namespace VitaNex
 				yield break;
 			}
 
-			List<PlayerMobile> players = Registry.GetValue(name);
+			var players = Registry.GetValue(name);
 
 			if (players == null || players.Count == 0)
 			{

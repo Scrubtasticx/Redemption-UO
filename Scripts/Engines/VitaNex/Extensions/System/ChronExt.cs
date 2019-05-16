@@ -3,17 +3,17 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
-using System.Collections.Generic;
-using System.Globalization;
+using System.Text;
 
 using VitaNex;
+using VitaNex.Collections;
 #endregion
 
 namespace System
@@ -35,14 +35,101 @@ namespace System
 		November = 0x400,
 		December = 0x800,
 
-		All = January | Febuary | March | April | May | June | July | August | September | October | November | December
+		All = ~None
+	}
+
+	public enum TimeUnit
+	{
+		Years,
+		Months,
+		Weeks,
+		Days,
+		Hours,
+		Minutes,
+		Seconds,
+		Milliseconds
 	}
 
 	public static class ChronExtUtility
 	{
+		public static bool InRange(this TimeSpan now, TimeSpan start, TimeSpan end)
+		{
+			if (start <= end)
+			{
+				return now >= start && now <= end;
+			}
+
+			return now >= start || now <= end;
+		}
+
+		public static bool InRange(this DateTime now, DateTime start, DateTime end)
+		{
+			if (now.Year < end.Year)
+			{
+				return now >= start;
+			}
+
+			if (now.Year > start.Year)
+			{
+				return now <= end;
+			}
+
+			return now >= start && now <= end;
+		}
+
+		public static double GetTotal(this TimeSpan time, TimeUnit unit)
+		{
+			var total = (double)time.Ticks;
+
+			switch (unit)
+			{
+				case TimeUnit.Years:
+					total = time.TotalDays / 365.2422;
+					break;
+				case TimeUnit.Months:
+					total = time.TotalDays / 30.43685;
+					break;
+				case TimeUnit.Weeks:
+					total = time.TotalDays / 7.0;
+					break;
+				case TimeUnit.Days:
+					total = time.TotalDays;
+					break;
+				case TimeUnit.Hours:
+					total = time.TotalHours;
+					break;
+				case TimeUnit.Minutes:
+					total = time.TotalMinutes;
+					break;
+				case TimeUnit.Seconds:
+					total = time.TotalSeconds;
+					break;
+				case TimeUnit.Milliseconds:
+					total = time.TotalMilliseconds;
+					break;
+			}
+
+			return total;
+		}
+
+		public static DateTime Interpolate(this DateTime start, DateTime end, double percent)
+		{
+			return new DateTime((long)(start.Ticks + ((end.Ticks - start.Ticks) * percent)));
+		}
+
+		public static TimeSpan Interpolate(this TimeSpan start, TimeSpan end, double percent)
+		{
+			return new TimeSpan((long)(start.Ticks + ((end.Ticks - start.Ticks) * percent)));
+		}
+
+		public static TimeStamp Interpolate(this TimeStamp start, TimeStamp end, double percent)
+		{
+			return new TimeStamp((long)(start.Ticks + ((end.Ticks - start.Ticks) * percent)));
+		}
+
 		public static TimeStamp ToTimeStamp(this DateTime date)
 		{
-			return date;
+			return new TimeStamp(date);
 		}
 
 		public static Months GetMonth(this DateTime date)
@@ -78,13 +165,52 @@ namespace System
 			}
 		}
 
+		public static string ToSimpleString(this TimeZoneInfo tzo, bool dst)
+		{
+			var build = ObjectPool<StringBuilder>.AcquireObject();
+
+			if (tzo.Id == "UTC")
+			{
+				return tzo.Id;
+			}
+
+			string value;
+
+			if (dst)
+			{
+				value = tzo.DaylightName.Replace("Daylight Time", String.Empty);
+			}
+			else
+			{
+				value = tzo.StandardName.Replace("Standard Time", String.Empty);
+			}
+
+			foreach (var c in value)
+			{
+				if (!Char.IsWhiteSpace(c) && Char.IsLetter(c) && Char.IsUpper(c))
+				{
+					build.Append(c);
+				}
+			}
+
+			build.Append(dst ? "-DT" : "-ST");
+
+			value = build.ToString();
+
+			ObjectPool.Free(ref build);
+
+			return value;
+		}
+
 		public static string ToSimpleString(this DateTime date, string format = "t D d M y")
 		{
-			var strs = new List<string>(format.Length);
+			var build = ObjectPool<StringBuilder>.AcquireObject();
 
-			bool noformat = false;
+			build.EnsureCapacity(format.Length * 2);
 
-			for (int i = 0; i < format.Length; i++)
+			var noformat = false;
+
+			for (var i = 0; i < format.Length; i++)
 			{
 				if (format[i] == '#')
 				{
@@ -94,96 +220,96 @@ namespace System
 
 				if (noformat)
 				{
-					strs.Add(format[i].ToString(CultureInfo.InvariantCulture));
+					build.Append(format[i]);
 					continue;
 				}
 
 				switch (format[i])
 				{
 					case '\\':
-						strs.Add((i + 1 < format.Length) ? format[++i].ToString(CultureInfo.InvariantCulture) : String.Empty);
+						build.Append((i + 1 < format.Length) ? Convert.ToString(format[++i]) : String.Empty);
 						break;
+					case 'x':
 					case 'z':
-						{
-							string tzo = TimeZoneInfo.Local.DisplayName;
-							int s = tzo.IndexOf(' ');
+					{
+						var utc = date.Kind == DateTimeKind.Utc;
+						var tzo = utc ? TimeZoneInfo.Utc : TimeZoneInfo.Local;
 
-							if (s > 0)
-							{
-								tzo = tzo.Substring(0, s);
-							}
-
-							strs.Add(tzo);
-						}
+						build.Append(ToSimpleString(tzo, false));
+					}
 						break;
+					case 'X':
 					case 'Z':
-						{
-							string tzo = date.IsDaylightSavingTime() ? TimeZoneInfo.Local.DaylightName : TimeZoneInfo.Local.DisplayName;
-							int s = tzo.IndexOf(' ');
+					{
+						var utc = date.Kind == DateTimeKind.Utc;
+						var tzo = utc ? TimeZoneInfo.Utc : TimeZoneInfo.Local;
 
-							if (s > 0)
-							{
-								tzo = tzo.Substring(0, s);
-							}
-
-							strs.Add(tzo);
-						}
+						build.Append(ToSimpleString(tzo, date.IsDaylightSavingTime()));
+					}
 						break;
 					case 'D':
-						strs.Add(date.DayOfWeek.ToString());
+						build.Append(date.DayOfWeek);
 						break;
 					case 'd':
-						strs.Add(date.Day.ToString(CultureInfo.InvariantCulture));
+						build.Append(date.Day);
 						break;
 					case 'M':
-						strs.Add(date.GetMonth().ToString());
+						build.Append(GetMonth(date));
 						break;
 					case 'm':
-						strs.Add(date.Month.ToString(CultureInfo.InvariantCulture));
+						build.Append(date.Month);
 						break;
 					case 'y':
-						strs.Add(date.Year.ToString(CultureInfo.InvariantCulture));
+						build.Append(date.Year);
 						break;
 					case 't':
+					{
+						var tf = String.Empty;
+
+						if (i + 1 < format.Length)
 						{
-							string tf = String.Empty;
-
-							if (i + 1 < format.Length)
+							if (format[i + 1] == '@')
 							{
-								if (format[i + 1] == '@')
-								{
-									++i;
+								++i;
 
-									while (++i < format.Length && format[i] != '@')
-									{
-										tf += format[i];
-									}
+								while (++i < format.Length && format[i] != '@')
+								{
+									tf += format[i];
 								}
 							}
-
-							strs.Add(date.TimeOfDay.ToSimpleString(!String.IsNullOrWhiteSpace(tf) ? tf : "h-m-s"));
 						}
+
+						build.Append(ToSimpleString(date.TimeOfDay, !String.IsNullOrWhiteSpace(tf) ? tf : "h-m-s"));
+					}
 						break;
 					default:
-						strs.Add(format[i].ToString(CultureInfo.InvariantCulture));
+						build.Append(format[i]);
 						break;
 				}
 			}
 
-			var str = String.Join(String.Empty, strs);
+			var value = build.ToString();
 
-			strs.Free(true);
+			ObjectPool.Free(ref build);
 
-			return str;
+			return value;
 		}
 
 		public static string ToSimpleString(this TimeSpan time, string format = "h-m-s")
 		{
-			var strs = new string[format.Length];
+			var build = ObjectPool<StringBuilder>.AcquireObject();
 
-			bool noformat = false;
+			build.EnsureCapacity(format.Length * 2);
 
-			for (int i = 0; i < format.Length && i < strs.Length; i++)
+			var noformat = false;
+			var nopadding = false;
+			var zeroValue = false;
+			var zeroEmpty = 0;
+
+			string fFormat, dFormat;
+			object append;
+
+			for (var i = 0; i < format.Length; i++)
 			{
 				if (format[i] == '#')
 				{
@@ -193,74 +319,139 @@ namespace System
 
 				if (noformat)
 				{
-					strs[i] = format[i].ToString(CultureInfo.InvariantCulture);
+					build.Append(format[i]);
 					continue;
 				}
 
 				switch (format[i])
 				{
+					case '!':
+						nopadding = !nopadding;
+						continue;
+				}
+
+				fFormat = zeroEmpty > 0 ? (nopadding ? "{0:#.#}" : "{0:#.##}") : (nopadding ? "{0:0.#}" : "{0:0.##}");
+				dFormat = zeroEmpty > 0 ? (nopadding ? "{0:#}" : "{0:##}") : (nopadding ? "{0:0}" : "{0:00}");
+
+				append = null;
+
+				switch (format[i])
+				{
+					case '<':
+						++zeroEmpty;
+						break;
+					case '>':
+					{
+						if (zeroEmpty == 0 || (zeroEmpty > 0 && --zeroEmpty == 0))
+						{
+							zeroValue = false;
+						}
+					}
+						break;
 					case '\\':
-						strs[i] = ((i + 1 < format.Length) ? format[++i].ToString(CultureInfo.InvariantCulture) : String.Empty);
+					{
+						if (i + 1 < format.Length)
+						{
+							append = format[++i];
+						}
+					}
+						break;
+					case 'x':
+						append = ToSimpleString(TimeZoneInfo.Utc, false);
+						break;
+					case 'X':
+						append = ToSimpleString(TimeZoneInfo.Utc, DateTime.UtcNow.IsDaylightSavingTime());
 						break;
 					case 'z':
-						{
-							string tzo = TimeZoneInfo.Local.DisplayName;
-							int s = tzo.IndexOf(' ');
-
-							if (s > 0)
-							{
-								tzo = tzo.Substring(0, s);
-							}
-
-							strs[i] = tzo;
-						}
+						append = ToSimpleString(TimeZoneInfo.Local, false);
 						break;
 					case 'Z':
-						{
-							string tzo = DateTime.Now.IsDaylightSavingTime()
-											 ? TimeZoneInfo.Local.DaylightName
-											 : TimeZoneInfo.Local.DisplayName;
-							int s = tzo.IndexOf(' ');
-
-							if (s > 0)
-							{
-								tzo = tzo.Substring(0, s);
-							}
-
-							strs[i] = tzo;
-						}
+						append = ToSimpleString(TimeZoneInfo.Local, DateTime.Now.IsDaylightSavingTime());
 						break;
 					case 'D':
-						strs[i] = String.Format("{0:F2}", time.TotalDays);
+					{
+						append = String.Format(fFormat, time.TotalDays);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 'H':
-						strs[i] = String.Format("{0:F2}", time.TotalHours);
+					{
+						append = String.Format(fFormat, time.TotalHours);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 'M':
-						strs[i] = String.Format("{0:F2}", time.TotalMinutes);
+					{
+						append = String.Format(fFormat, time.TotalMinutes);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 'S':
-						strs[i] = String.Format("{0:F2}", time.TotalSeconds);
+					{
+						append = String.Format(fFormat, time.TotalSeconds);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 'd':
-						strs[i] = String.Format("{0:D2}", time.Days);
+					{
+						append = String.Format(dFormat, time.Days);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 'h':
-						strs[i] = String.Format("{0:D2}", time.Hours);
+					{
+						append = String.Format(dFormat, time.Hours);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 'm':
-						strs[i] = String.Format("{0:D2}", time.Minutes);
+					{
+						append = String.Format(dFormat, time.Minutes);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					case 's':
-						strs[i] = String.Format("{0:D2}", time.Seconds);
+					{
+						append = String.Format(dFormat, time.Seconds);
+						zeroValue = String.IsNullOrWhiteSpace((string)append);
+					}
 						break;
 					default:
-						strs[i] = format[i].ToString(CultureInfo.InvariantCulture);
+						append = format[i];
 						break;
+				}
+
+				if (append != null && (!zeroValue || zeroEmpty <= 0))
+				{
+					build.Append(append);
 				}
 			}
 
-			return String.Join(String.Empty, strs);
+			var value = build.ToString();
+
+			ObjectPool.Free(ref build);
+
+			return value;
+		}
+
+		public static string ToDirectoryName(this DateTime date, string format = "D d M y")
+		{
+			return ToSimpleString(date, format);
+		}
+
+		public static string ToFileName(this DateTime date, string format = "D d M y")
+		{
+			return ToSimpleString(date, format);
+		}
+
+		public static string ToDirectoryName(this TimeSpan time, string format = "h-m")
+		{
+			return ToSimpleString(time, format);
+		}
+
+		public static string ToFileName(this TimeSpan time, string format = "h-m")
+		{
+			return ToSimpleString(time, format);
 		}
 	}
 }

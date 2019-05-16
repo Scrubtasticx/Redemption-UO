@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -42,9 +42,20 @@ namespace VitaNex
 		private static AllowBeneficialHandler _BeneficialParent;
 		private static AllowHarmfulHandler _HarmfulParent;
 
-		public static NotorietyHandler NotorietyParent { get { return _NotorietyParent ?? (_NotorietyParent = Notoriety.Handler); } }
-		public static AllowBeneficialHandler BeneficialParent { get { return _BeneficialParent ?? (_BeneficialParent = NotorietyHandlers.Mobile_AllowBeneficial); } }
-		public static AllowHarmfulHandler HarmfulParent { get { return _HarmfulParent ?? (_HarmfulParent = NotorietyHandlers.Mobile_AllowHarmful); } }
+		public static NotorietyHandler NotorietyParent
+		{
+			get { return _NotorietyParent ?? (_NotorietyParent = Notoriety.Handler); }
+		}
+
+		public static AllowBeneficialHandler BeneficialParent
+		{
+			get { return _BeneficialParent ?? (_BeneficialParent = NotorietyHandlers.Mobile_AllowBeneficial); }
+		}
+
+		public static AllowHarmfulHandler HarmfulParent
+		{
+			get { return _HarmfulParent ?? (_HarmfulParent = NotorietyHandlers.Mobile_AllowHarmful); }
+		}
 
 		private static readonly List<NotorietyEntry<int>> _NameHandlers = new List<NotorietyEntry<int>>();
 		private static readonly List<NotorietyEntry<bool>> _BeneficialHandlers = new List<NotorietyEntry<bool>>();
@@ -132,11 +143,12 @@ namespace VitaNex
 				return _BeneficialParent(a, b);
 			}
 
-			foreach (var handler in
-				_BeneficialHandlers.OrderByDescending(e => e.Priority).Where(e => e.Handler != null).Select(e => e.Handler))
+			foreach (var handler in _BeneficialHandlers.Where(e => e.Handler != null)
+													   .OrderByDescending(e => e.Priority)
+													   .Select(e => e.Handler))
 			{
 				bool handled;
-				bool result = handler(a, b, out handled);
+				var result = handler(a, b, out handled);
 
 				if (handled)
 				{
@@ -146,6 +158,23 @@ namespace VitaNex
 
 			return _BeneficialParent(a, b);
 		}
+
+#if ServUO
+		public static bool AllowHarmful(Mobile a, IDamageable b)
+		{
+			if (b is Mobile)
+			{
+				return AllowHarmful(a, (Mobile)b);
+			}
+
+			if (_HarmfulParent == null)
+			{
+				_HarmfulParent = NotorietyHandlers.Mobile_AllowHarmful;
+			}
+
+			return _HarmfulParent(a, b);
+		}
+#endif
 
 		public static bool AllowHarmful(Mobile a, Mobile b)
 		{
@@ -159,11 +188,12 @@ namespace VitaNex
 				return _HarmfulParent(a, b);
 			}
 
-			foreach (var handler in
-				_HarmfulHandlers.OrderByDescending(e => e.Priority).Where(e => e.Handler != null).Select(e => e.Handler))
+			foreach (var handler in _HarmfulHandlers.Where(e => e.Handler != null)
+													.OrderByDescending(e => e.Priority)
+													.Select(e => e.Handler))
 			{
 				bool handled;
-				bool result = handler(a, b, out handled);
+				var result = handler(a, b, out handled);
 
 				if (handled)
 				{
@@ -173,6 +203,23 @@ namespace VitaNex
 
 			return _HarmfulParent(a, b);
 		}
+
+#if ServUO
+		public static int MobileNotoriety(Mobile a, IDamageable b)
+		{
+			if (b is Mobile)
+			{
+				return MobileNotoriety(a, (Mobile)b);
+			}
+
+			if (_NotorietyParent == null)
+			{
+				_NotorietyParent = NotorietyHandlers.MobileNotoriety;
+			}
+
+			return _NotorietyParent(a, b);
+		}
+#endif
 
 		public static int MobileNotoriety(Mobile a, Mobile b)
 		{
@@ -186,26 +233,50 @@ namespace VitaNex
 				return _NotorietyParent(a, b);
 			}
 
-			foreach (var handler in
-				_NameHandlers.OrderByDescending(e => e.Priority).Where(e => e.Handler != null).Select(e => e.Handler))
+			foreach (var handler in _NameHandlers.Where(e => e.Handler != null)
+												 .OrderByDescending(e => e.Priority)
+												 .Select(e => e.Handler))
 			{
 				bool handled;
-				int result = handler(a, b, out handled);
+				var result = handler(a, b, out handled);
 
-				if (!handled)
+				if (handled)
 				{
-					continue;
-				}
+					if (result <= Bubble)
+					{
+						break;
+					}
 
-				if (result <= Bubble)
-				{
-					break;
+					return result;
 				}
-
-				return result;
 			}
 
 			return _NotorietyParent(a, b);
+		}
+
+		public static bool Resolve<T1, T2>(Mobile a, Mobile b, out T1 x, out T2 y)
+			where T1 : Mobile
+			where T2 : Mobile
+		{
+			x = null;
+			y = null;
+
+			if (a == null || a.Deleted || b == null || b.Deleted)
+			{
+				return false;
+			}
+
+			if (!a.IsControlled(out x))
+			{
+				x = a as T1;
+			}
+
+			if (!b.IsControlled(out y))
+			{
+				y = b as T2;
+			}
+
+			return x != null && y != null;
 		}
 	}
 }

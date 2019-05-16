@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,7 +21,13 @@ namespace VitaNex.SuperGumps
 {
 	public abstract partial class SuperGump
 	{
-		public Dictionary<GumpTextEntry, Action<GumpTextEntry, string>> TextInputs { get; private set; }
+		private Dictionary<GumpTextEntry, Action<GumpTextEntry, string>> _TextInputs;
+
+		public Dictionary<GumpTextEntry, Action<GumpTextEntry, string>> TextInputs
+		{
+			get { return _TextInputs; }
+			protected set { _TextInputs = value; }
+		}
 
 		public Action<GumpTextEntry, string> TextInputHandler { get; set; }
 
@@ -36,13 +42,26 @@ namespace VitaNex.SuperGumps
 		}
 
 		public void AddTextEntry(
-			int x, int y, int width, int height, int hue, string text, Action<GumpTextEntry, string> handler)
+			int x,
+			int y,
+			int width,
+			int height,
+			int hue,
+			string text,
+			Action<GumpTextEntry, string> handler)
 		{
 			AddTextEntry(x, y, width, height, hue, NewTextEntryID(), text, handler);
 		}
 
 		public void AddTextEntry(
-			int x, int y, int width, int height, int hue, int entryID, string text, Action<GumpTextEntry, string> handler)
+			int x,
+			int y,
+			int width,
+			int height,
+			int hue,
+			int entryID,
+			string text,
+			Action<GumpTextEntry, string> handler)
 		{
 			AddTextEntry(new GumpTextEntry(x, y, width, height, hue, entryID, text), handler);
 		}
@@ -54,14 +73,7 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			if (!TextInputs.ContainsKey(input))
-			{
-				TextInputs.Add(input, handler);
-			}
-			else
-			{
-				TextInputs[input] = handler;
-			}
+			TextInputs[input] = handler;
 
 			Add(input);
 		}
@@ -80,7 +92,7 @@ namespace VitaNex.SuperGumps
 
 		public virtual bool CanDisplay(GumpTextEntry input)
 		{
-			return (input != null);
+			return input != null;
 		}
 
 		public GumpTextEntry GetTextEntry(int inputID)

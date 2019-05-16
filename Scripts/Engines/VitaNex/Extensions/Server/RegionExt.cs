@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -102,20 +102,20 @@ namespace Server
 				{
 					var effects = new EffectInfo[Area.Length][,];
 
-					effects.SetAll(i => new EffectInfo[Area[i].Width,Area[i].Height]);
+					effects.SetAll(i => new EffectInfo[Area[i].Width, Area[i].Height]);
 
-					for (int index = 0; index < Area.Length; index++)
+					for (var index = 0; index < Area.Length; index++)
 					{
 						var b = Area[index];
 
-						int xSpacing = Math.Max(1, Math.Min(16, b.Width / 8));
-						int ySpacing = Math.Max(1, Math.Min(16, b.Height / 8));
+						var xSpacing = Math.Max(1, Math.Min(16, b.Width / 8));
+						var ySpacing = Math.Max(1, Math.Min(16, b.Height / 8));
 
-						int minX = Math.Min(b.Start.X, b.End.X);
-						int maxX = Math.Max(b.Start.X, b.End.X);
+						var minX = Math.Min(b.Start.X, b.End.X);
+						var maxX = Math.Max(b.Start.X, b.End.X);
 
-						int minY = Math.Min(b.Start.Y, b.End.Y);
-						int maxY = Math.Max(b.Start.Y, b.End.Y);
+						var minY = Math.Min(b.Start.Y, b.End.Y);
+						var maxY = Math.Max(b.Start.Y, b.End.Y);
 
 						Parallel.For(
 							minX,
@@ -131,19 +131,25 @@ namespace Server
 										return;
 									}
 
-									int idxX = x - minX;
-									int idxY = y - minY;
+									var idxX = x - minX;
+									var idxY = y - minY;
 
 									effects[index][idxX, idxY] = new EffectInfo(
-										new Point3D(x, y, 0), Map, EffectID, EffectHue, 1, 25, EffectRender);
+										new Point3D(x, y, 0),
+										Map,
+										EffectID,
+										EffectHue,
+										1,
+										25,
+										EffectRender);
 								}));
 					}
 
-					Effects = effects.AsParallel().SelectMany(list => list.OfType<EffectInfo>()).ToArray();
+					Effects = effects.SelectMany(list => list.OfType<EffectInfo>()).ToArray();
 
 					foreach (var e in Effects)
 					{
-						e.SetSource(e.Source.GetWorldTop(e.Map));
+						e.SetSource(e.Source.ToPoint3D(e.Source.GetAverageZ(e.Map)));
 					}
 				}
 
@@ -198,402 +204,6 @@ namespace Server
 				Expire = DateTime.UtcNow;
 
 				_Previews.Remove(Serial);
-			}
-
-			public override bool AcceptsSpawnsFrom(Region region)
-			{
-				if (Parent != null)
-				{
-					return Parent.AcceptsSpawnsFrom(region);
-				}
-
-				return base.AcceptsSpawnsFrom(region);
-			}
-
-			public override bool AllowBeneficial(Mobile m, Mobile target)
-			{
-				if (Parent != null)
-				{
-					return Parent.AllowBeneficial(m, target);
-				}
-
-				return base.AllowBeneficial(m, target);
-			}
-
-			public override bool AllowHarmful(Mobile m, Mobile target)
-			{
-				if (Parent != null)
-				{
-					return Parent.AllowHarmful(m, target);
-				}
-
-				return base.AllowHarmful(m, target);
-			}
-
-			public override bool AllowHousing(Mobile m, Point3D p)
-			{
-				if (Parent != null)
-				{
-					return Parent.AllowHousing(m, p);
-				}
-
-				return base.AllowHousing(m, p);
-			}
-
-			public override bool AllowSpawn()
-			{
-				if (Parent != null)
-				{
-					return Parent.AllowSpawn();
-				}
-
-				return base.AllowSpawn();
-			}
-
-			public override void AlterLightLevel(Mobile m, ref int global, ref int personal)
-			{
-				if (Parent != null)
-				{
-					Parent.AlterLightLevel(m, ref global, ref personal);
-					return;
-				}
-
-				base.AlterLightLevel(m, ref global, ref personal);
-			}
-
-			public override bool CanUseStuckMenu(Mobile m)
-			{
-				if (Parent != null)
-				{
-					return Parent.CanUseStuckMenu(m);
-				}
-
-				return base.CanUseStuckMenu(m);
-			}
-
-			public override bool CheckAccessibility(Item item, Mobile m)
-			{
-				if (Parent != null)
-				{
-					return Parent.CheckAccessibility(item, m);
-				}
-
-				return base.CheckAccessibility(item, m);
-			}
-
-			public override TimeSpan GetLogoutDelay(Mobile m)
-			{
-				if (Parent != null)
-				{
-					return Parent.GetLogoutDelay(m);
-				}
-
-				return base.GetLogoutDelay(m);
-			}
-
-			public override Type GetResource(Type type)
-			{
-				if (Parent != null)
-				{
-					return Parent.GetResource(type);
-				}
-
-				return base.GetResource(type);
-			}
-
-			public override void OnAggressed(Mobile aggressor, Mobile aggressed, bool criminal)
-			{
-				if (Parent != null)
-				{
-					Parent.OnAggressed(aggressor, aggressed, criminal);
-					return;
-				}
-
-				base.OnAggressed(aggressor, aggressed, criminal);
-			}
-
-			public override bool OnBeforeDeath(Mobile m)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnBeforeDeath(m);
-				}
-
-				return base.OnBeforeDeath(m);
-			}
-
-			public override bool OnBeginSpellCast(Mobile m, ISpell s)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnBeginSpellCast(m, s);
-				}
-
-				return base.OnBeginSpellCast(m, s);
-			}
-
-			public override void OnBeneficialAction(Mobile helper, Mobile target)
-			{
-				if (Parent != null)
-				{
-					Parent.OnBeneficialAction(helper, target);
-					return;
-				}
-
-				base.OnBeneficialAction(helper, target);
-			}
-
-			public override void OnChildAdded(Region child)
-			{
-				if (Parent != null)
-				{
-					Parent.OnChildAdded(child);
-					return;
-				}
-
-				base.OnChildAdded(child);
-			}
-
-			public override void OnChildRemoved(Region child)
-			{
-				if (Parent != null)
-				{
-					Parent.OnChildRemoved(child);
-					return;
-				}
-
-				base.OnChildRemoved(child);
-			}
-
-			public override bool OnCombatantChange(Mobile m, Mobile Old, Mobile New)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnCombatantChange(m, Old, New);
-				}
-
-				return base.OnCombatantChange(m, Old, New);
-			}
-
-			public override void OnCriminalAction(Mobile m, bool message)
-			{
-				if (Parent != null)
-				{
-					Parent.OnCriminalAction(m, message);
-					return;
-				}
-
-				base.OnCriminalAction(m, message);
-			}
-
-			public override bool OnDamage(Mobile m, ref int damage)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnDamage(m, ref damage);
-				}
-
-				return base.OnDamage(m, ref damage);
-			}
-
-			public override void OnDeath(Mobile m)
-			{
-				if (Parent != null)
-				{
-					Parent.OnDeath(m);
-					return;
-				}
-
-				base.OnDeath(m);
-			}
-
-			public override bool OnDecay(Item item)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnDecay(item);
-				}
-
-				return base.OnDecay(item);
-			}
-
-			public override void OnDidHarmful(Mobile harmer, Mobile harmed)
-			{
-				if (Parent != null)
-				{
-					Parent.OnDidHarmful(harmer, harmed);
-					return;
-				}
-
-				base.OnDidHarmful(harmer, harmed);
-			}
-
-			public override bool OnDoubleClick(Mobile m, object o)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnDoubleClick(m, o);
-				}
-
-				return base.OnDoubleClick(m, o);
-			}
-
-			public override void OnEnter(Mobile m)
-			{
-				if (Parent != null)
-				{
-					Parent.OnEnter(m);
-					return;
-				}
-
-				base.OnEnter(m);
-			}
-
-			public override void OnExit(Mobile m)
-			{
-				if (Parent != null)
-				{
-					Parent.OnExit(m);
-					return;
-				}
-
-				base.OnExit(m);
-			}
-
-			public override void OnGotBeneficialAction(Mobile helper, Mobile target)
-			{
-				if (Parent != null)
-				{
-					Parent.OnGotBeneficialAction(helper, target);
-					return;
-				}
-
-				base.OnGotBeneficialAction(helper, target);
-			}
-
-			public override void OnGotHarmful(Mobile harmer, Mobile harmed)
-			{
-				if (Parent != null)
-				{
-					Parent.OnGotHarmful(harmer, harmed);
-					return;
-				}
-
-				base.OnGotHarmful(harmer, harmed);
-			}
-
-			public override bool OnHeal(Mobile m, ref int heal)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnHeal(m, ref heal);
-				}
-
-				return base.OnHeal(m, ref heal);
-			}
-
-			public override void OnLocationChanged(Mobile m, Point3D oldLocation)
-			{
-				if (Parent != null)
-				{
-					Parent.OnLocationChanged(m, oldLocation);
-					return;
-				}
-
-				base.OnLocationChanged(m, oldLocation);
-			}
-
-			public override bool OnMoveInto(Mobile m, Direction d, Point3D newLocation, Point3D oldLocation)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnMoveInto(m, d, newLocation, oldLocation);
-				}
-
-				return base.OnMoveInto(m, d, newLocation, oldLocation);
-			}
-
-			public override bool OnResurrect(Mobile m)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnResurrect(m);
-				}
-
-				return base.OnResurrect(m);
-			}
-
-			public override bool OnSingleClick(Mobile m, object o)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnSingleClick(m, o);
-				}
-
-				return base.OnSingleClick(m, o);
-			}
-
-			public override bool OnSkillUse(Mobile m, int skill)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnSkillUse(m, skill);
-				}
-
-				return base.OnSkillUse(m, skill);
-			}
-
-			public override void OnSpeech(SpeechEventArgs args)
-			{
-				if (Parent != null)
-				{
-					Parent.OnSpeech(args);
-					return;
-				}
-
-				base.OnSpeech(args);
-			}
-
-			public override void OnSpellCast(Mobile m, ISpell s)
-			{
-				if (Parent != null)
-				{
-					Parent.OnSpellCast(m, s);
-					return;
-				}
-
-				base.OnSpellCast(m, s);
-			}
-
-			public override bool OnTarget(Mobile m, Targeting.Target t, object o)
-			{
-				if (Parent != null)
-				{
-					return Parent.OnTarget(m, t, o);
-				}
-
-				return base.OnTarget(m, t, o);
-			}
-
-			public override void SpellDamageScalar(Mobile caster, Mobile target, ref double damage)
-			{
-				if (Parent != null)
-				{
-					Parent.SpellDamageScalar(caster, target, ref damage);
-					return;
-				}
-
-				base.SpellDamageScalar(caster, target, ref damage);
-			}
-
-			public override bool SendInaccessibleMessage(Item item, Mobile m)
-			{
-				if (Parent != null)
-				{
-					return Parent.SendInaccessibleMessage(item, m);
-				}
-
-				return base.SendInaccessibleMessage(item, m);
 			}
 
 			public bool Equals(Region other)
@@ -663,7 +273,10 @@ namespace Server
 		}
 
 		public static PreviewRegion DisplayPreview(
-			this Region r, int hue = 85, int effect = 1801, EffectRender render = EffectRender.SemiTransparent)
+			this Region r,
+			int hue = 85,
+			int effect = 1801,
+			EffectRender render = EffectRender.SemiTransparent)
 		{
 			if (r == null || r.Area == null || r.Area.Length == 0)
 			{
@@ -781,7 +394,8 @@ namespace Server
 			return r.Rect.Contains(p);
 		}
 
-		public static TRegion Create<TRegion>(params object[] args) where TRegion : Region
+		public static TRegion Create<TRegion>(params object[] args)
+			where TRegion : Region
 		{
 			return Create(typeof(TRegion), args) as TRegion;
 		}
@@ -791,7 +405,8 @@ namespace Server
 			return type.CreateInstanceSafe<Region>(args);
 		}
 
-		public static TRegion Clone<TRegion>(this TRegion region, params object[] args) where TRegion : Region
+		public static TRegion Clone<TRegion>(this TRegion region, params object[] args)
+			where TRegion : Region
 		{
 			if (region == null)
 			{
@@ -833,17 +448,20 @@ namespace Server
 			return reg;
 		}
 
-		public static bool IsPartOf<TRegion>(this Region region) where TRegion : Region
+		public static bool IsPartOf<TRegion>(this Region region)
+			where TRegion : Region
 		{
 			return region != null && region.IsPartOf(typeof(TRegion));
 		}
 
-		public static TRegion GetRegion<TRegion>(this Region region) where TRegion : Region
+		public static TRegion GetRegion<TRegion>(this Region region)
+			where TRegion : Region
 		{
 			return region != null ? region.GetRegion(typeof(TRegion)) as TRegion : null;
 		}
 
-		public static TRegion GetRegion<TRegion>(this Mobile m) where TRegion : Region
+		public static TRegion GetRegion<TRegion>(this Mobile m)
+			where TRegion : Region
 		{
 			return m != null ? GetRegion<TRegion>(m.Region) : null;
 		}
@@ -858,7 +476,8 @@ namespace Server
 			return m != null && m.Region != null ? m.Region.GetRegion(name) : null;
 		}
 
-		public static bool InRegion<TRegion>(this Mobile m) where TRegion : Region
+		public static bool InRegion<TRegion>(this Mobile m)
+			where TRegion : Region
 		{
 			return m != null && GetRegion<TRegion>(m.Region) != null;
 		}
@@ -878,7 +497,18 @@ namespace Server
 			return m != null && m.Region != null && m.Region.IsPartOf(r);
 		}
 
-		public static TRegion GetRegion<TRegion>(this Item i) where TRegion : Region
+		public static Region GetRegion(this Item i)
+		{
+			if (i == null)
+			{
+				return null;
+			}
+
+			return Region.Find(i.GetWorldLocation(), i.Map);
+		}
+
+		public static TRegion GetRegion<TRegion>(this Item i)
+			where TRegion : Region
 		{
 			if (i == null)
 			{
@@ -914,7 +544,8 @@ namespace Server
 			return reg != null ? reg.GetRegion(type) : null;
 		}
 
-		public static bool InRegion<TRegion>(this Item i) where TRegion : Region
+		public static bool InRegion<TRegion>(this Item i)
+			where TRegion : Region
 		{
 			if (i == null)
 			{

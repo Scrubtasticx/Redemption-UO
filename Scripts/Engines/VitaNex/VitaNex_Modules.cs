@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -17,24 +17,32 @@ using System.Linq;
 using System.Reflection;
 
 using Server;
-using Server.Gumps;
-using Server.Mobiles;
 
 using VitaNex.IO;
 using VitaNex.SuperGumps;
-using VitaNex.SuperGumps.UI;
 #endregion
 
 namespace VitaNex
 {
-	/// <summary>
-	///     Exposes an interface for managing VitaNexCore and its' sub-systems.
-	/// </summary>
 	public static partial class VitaNexCore
 	{
-		private static List<CoreModuleInfo> _CoreModules;
+		public static IEnumerable<CoreModuleInfo> Modules
+		{
+			get
+			{
+				var idx = _Plugins.Count;
 
-		public static CoreModuleInfo[] CoreModules { get { return _CoreModules.ToArray(); } }
+				while (--idx >= 0)
+				{
+					if (_Plugins.InBounds(idx) && _Plugins[idx] is CoreModuleInfo)
+					{
+						yield return (CoreModuleInfo)_Plugins[idx];
+					}
+				}
+			}
+		}
+
+		public static int ModuleCount { get { return Modules.Count(); } }
 
 		public static Dictionary<Type, CoreModuleAttribute> CoreModuleTypeCache { get; private set; }
 		public static Assembly[] ModuleAssemblies { get; private set; }
@@ -49,7 +57,7 @@ namespace VitaNex
 
 		public static CoreModuleInfo GetModule(Type t)
 		{
-			return CoreModules.FirstOrDefault(cmi => cmi.TypeOf.IsEqualOrChildOf(t));
+			return Modules.FirstOrDefault(cmi => cmi.TypeOf.IsEqualOrChildOf(t));
 		}
 
 		public static CoreModuleInfo[] GetModules(string name, bool ignoreCase = true)
@@ -59,11 +67,19 @@ namespace VitaNex
 
 		public static IEnumerable<CoreModuleInfo> FindModules(string name, bool ignoreCase = true)
 		{
-			return
-				CoreModules.Where(
-					cmi =>
-					String.Equals(
-						cmi.Name, name, ignoreCase ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture));
+			var c = ignoreCase ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture;
+
+			var idx = _Plugins.Count;
+
+			while (--idx >= 0)
+			{
+				var cp = _Plugins[idx] as CoreModuleInfo;
+
+				if (cp != null && String.Equals(cp.Name, name, c))
+				{
+					yield return cp;
+				}
+			}
 		}
 
 		private static void CompileModules()
@@ -78,27 +94,20 @@ namespace VitaNex
 			TryCatch(
 				() =>
 				{
-					var files = ModulesDirectory.GetFiles("*.vnc.mod.dll", SearchOption.AllDirectories);
+					var files = ModulesDirectory.GetFiles("*.dll", SearchOption.AllDirectories);
 					var asm = new List<Assembly>(files.Length);
 
-					foreach (FileInfo file in files)
+					foreach (var file in files)
 					{
-						TryCatch(
-							() =>
-							{
-								Assembly a = Assembly.LoadFrom(file.FullName);
-
-								if (a != null && !asm.Contains(a))
-								{
-									asm.Add(a);
-								}
-							},
-							ToConsole);
+						TryCatch(() => asm.AddOrReplace(Assembly.LoadFrom(file.FullName)), ToConsole);
 					}
 
 					ModuleAssemblies = asm.ToArray();
+
 					asm.AddRange(ScriptCompiler.Assemblies);
-					ScriptCompiler.Assemblies = asm.ToArray();
+					asm.Prune();
+
+					ScriptCompiler.Assemblies = asm.FreeToArray(true);
 				},
 				ToConsole);
 		}
@@ -109,16 +118,7 @@ namespace VitaNex
 
 			var types = GetCoreModuleTypes();
 
-			_CoreModules = new List<CoreModuleInfo>(types.Count);
-
-			foreach (
-				CoreModuleInfo cmi in types.Select(kvp => new CoreModuleInfo(kvp.Key, kvp.Value)).OrderBy(cmi => cmi.Priority))
-			{
-				_CoreModules.Add(cmi);
-				TryCatch(cmi.OnRegistered, cmi.ToConsole);
-			}
-
-			foreach (var cmi in _CoreModules.OrderBy(cmi => cmi.Priority))
+			foreach (var cmi in types.Select(kvp => new CoreModuleInfo(kvp.Key, kvp.Value)).OrderBy(cmi => cmi.Priority))
 			{
 				ConfigureModule(cmi);
 			}
@@ -159,7 +159,7 @@ namespace VitaNex
 		{
 			ToConsole("Invoking Modules...");
 
-			foreach (var cmi in _CoreModules.OrderBy(cmi => cmi.Priority))
+			foreach (var cmi in Modules.OrderBy(cmi => cmi.Priority))
 			{
 				InvokeModule(cmi);
 			}
@@ -200,7 +200,7 @@ namespace VitaNex
 		{
 			ToConsole("Saving Modules...");
 
-			foreach (var cmi in _CoreModules.OrderBy(cmi => cmi.Priority))
+			foreach (var cmi in Modules.OrderBy(cmi => cmi.Priority))
 			{
 				SaveModule(cmi);
 			}
@@ -236,7 +236,7 @@ namespace VitaNex
 		{
 			ToConsole("Loading Modules...");
 
-			foreach (var cmi in _CoreModules.OrderBy(cmi => cmi.Priority))
+			foreach (var cmi in Modules.OrderBy(cmi => cmi.Priority))
 			{
 				LoadModule(cmi);
 			}
@@ -272,7 +272,7 @@ namespace VitaNex
 		{
 			ToConsole("Disposing Modules...");
 
-			foreach (var cmi in _CoreModules.OrderByDescending(cmi => cmi.Priority))
+			foreach (var cmi in Modules.OrderByDescending(cmi => cmi.Priority))
 			{
 				DisposeModule(cmi);
 			}
@@ -335,10 +335,6 @@ namespace VitaNex
 			}
 		}
 
-		/// <summary>
-		///     Gets a collection of [cached] Types representing all CoreModules this assembly
-		/// </summary>
-		/// <returns></returns>
 		public static Dictionary<Type, CoreModuleAttribute> GetCoreModuleTypes()
 		{
 			if (CoreModuleTypeCache != null && CoreModuleTypeCache.Count > 0)
@@ -348,11 +344,9 @@ namespace VitaNex
 
 			CoreModuleTypeCache = new Dictionary<Type, CoreModuleAttribute>();
 
-			foreach (var kvp in
-				ScriptCompiler.Assemblies.SelectMany(
-					asm => GetCoreModuleTypes(asm).Where(kvp => !CoreModuleTypeCache.ContainsKey(kvp.Key))))
+			foreach (var kvp in ScriptCompiler.Assemblies.SelectMany(GetCoreModuleTypes))
 			{
-				CoreModuleTypeCache.Add(kvp.Key, kvp.Value);
+				CoreModuleTypeCache[kvp.Key] = kvp.Value;
 			}
 
 			return CoreModuleTypeCache;
@@ -362,11 +356,11 @@ namespace VitaNex
 		{
 			CoreModuleAttribute[] attrs;
 
-			foreach (Type typeOf in asm.GetTypes().Where(typeOf => typeOf != null && typeOf.IsClass))
+			foreach (var typeOf in asm.GetTypes().Where(t => t != null && t.IsClass && t.IsAbstract && t.IsSealed))
 			{
-				attrs = typeOf.GetCustomAttributes(typeof(CoreModuleAttribute), false) as CoreModuleAttribute[];
+				attrs = typeOf.GetCustomAttributes<CoreModuleAttribute>(false);
 
-				if (attrs != null && attrs.Length != 0)
+				if (attrs != null && attrs.Length > 0)
 				{
 					yield return new KeyValuePair<Type, CoreModuleAttribute>(typeOf, attrs[0]);
 				}
@@ -374,7 +368,7 @@ namespace VitaNex
 		}
 	}
 
-	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+	[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 	public sealed class CoreModuleAttribute : Attribute
 	{
 		public string Name { get; set; }
@@ -382,7 +376,7 @@ namespace VitaNex
 		public bool Enabled { get; set; }
 		public int Priority { get; set; }
 		public bool Debug { get; set; }
-		public bool QuietMode { get; set; }
+		public bool Quiet { get; set; }
 
 		public CoreModuleAttribute(
 			string name,
@@ -390,18 +384,19 @@ namespace VitaNex
 			bool enabled = false,
 			int priority = TaskPriority.Medium,
 			bool debug = false,
-			bool quietMode = true)
+			bool quiet = true)
 		{
 			Name = name;
 			Version = version;
 			Enabled = enabled;
 			Priority = priority;
 			Debug = debug;
-			QuietMode = quietMode;
+			Quiet = quiet;
 		}
 	}
 
-	public sealed class CoreModuleInfo : IComparable<CoreModuleInfo>
+	[PropertyObject]
+	public sealed class CoreModuleInfo : ICorePluginInfo
 	{
 		private const BindingFlags SearchFlags =
 			BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
@@ -418,10 +413,11 @@ namespace VitaNex
 		private readonly Type _TypeOf;
 
 		private int _Priority;
+		private string _Name;
+
 		private bool _Enabled;
 		private bool _Debug;
-		private bool _QuietMode;
-		private string _Name;
+		private bool _Quiet;
 
 		private Action _EnabledHandler;
 		private Action _DisabledHandler;
@@ -432,7 +428,7 @@ namespace VitaNex
 		private Action _DisposeHandler;
 
 		private CoreModuleOptions _Options;
-		private VersionInfo _Version = new VersionInfo();
+		private VersionInfo _Version;
 
 		public bool OptionsSupported { get { return _OptionsProperty != null; } }
 		public bool EnabledSupported { get { return _EnabledMethod != null; } }
@@ -443,6 +439,12 @@ namespace VitaNex
 		public bool SaveSupported { get { return _SaveMethod != null; } }
 		public bool DisposeSupported { get { return _DisposeMethod != null; } }
 
+		public bool Active
+		{
+			get { return Enabled && !Disposed; }
+			set { Enabled = !Disposed && value; }
+		}
+
 		public bool Configured { get; private set; }
 		public bool Invoked { get; private set; }
 		public bool Disposed { get; private set; }
@@ -451,6 +453,7 @@ namespace VitaNex
 		public Assembly DynamicAssembly { get; private set; }
 		public FileInfo DynamicAssemblyFile { get; private set; }
 
+		[CommandProperty(VitaNexCore.Access)]
 		public bool Dynamic { get { return (DynamicAssembly != null && DynamicAssemblyFile != null); } }
 
 		[CommandProperty(VitaNexCore.Access)]
@@ -471,15 +474,10 @@ namespace VitaNex
 		public VersionInfo Version { get { return _Version ?? (_Version = new VersionInfo()); } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public string Name
-		{
-			get { return _Name ?? (_Name = _TypeOf.Name); }
-			set
-			{
-				_Name = value ?? _TypeOf.Name;
-				SaveState();
-			}
-		}
+		public string Name { get { return _Name ?? (_Name = _TypeOf.Name); } }
+
+		[CommandProperty(VitaNexCore.Access)]
+		public string FullName { get { return String.Format("{0}/{1}", Name, Version); } }
 
 		[CommandProperty(VitaNexCore.Access)]
 		public bool Enabled
@@ -550,12 +548,12 @@ namespace VitaNex
 		}
 
 		[CommandProperty(VitaNexCore.Access)]
-		public bool QuietMode
+		public bool Quiet
 		{
-			get { return _QuietMode; }
+			get { return _Quiet; }
 			set
 			{
-				_QuietMode = value;
+				_Quiet = value;
 				SaveState();
 			}
 		}
@@ -566,8 +564,8 @@ namespace VitaNex
 			get
 			{
 				return OptionsSupported && _OptionsProperty.CanRead
-						   ? (CoreModuleOptions)_OptionsProperty.GetValue(_TypeOf, null)
-						   : (_Options ?? (_Options = new CoreModuleOptions(_TypeOf)));
+					? (CoreModuleOptions)_OptionsProperty.GetValue(_TypeOf, null)
+					: (_Options ?? (_Options = new CoreModuleOptions(_TypeOf)));
 			}
 			set
 			{
@@ -583,40 +581,24 @@ namespace VitaNex
 		}
 
 		public CoreModuleInfo(Type t, CoreModuleAttribute attr)
-			: this(t, attr.Version, attr.Name, attr.Enabled, attr.Priority, attr.Debug, attr.QuietMode)
+			: this(t, attr.Version, attr.Name, attr.Enabled, attr.Priority, attr.Debug, attr.Quiet)
 		{ }
 
-		public CoreModuleInfo(
-			Type typeOf,
-			string version,
-			string name,
-			bool enabled,
-			int priority,
-			bool debug,
-			bool quietMode,
-			Assembly dynAsm = null)
+		public CoreModuleInfo(Type t, string version, string name, bool enabled, int priority, bool debug, bool quiet)
 		{
-			_TypeOf = typeOf;
+			_TypeOf = t;
 			_Name = name;
 			_Version = version;
 			_Enabled = enabled;
 			_Priority = priority;
 			_Debug = debug;
-			_QuietMode = quietMode;
+			_Quiet = quiet;
+
 			Deferred = !_Enabled;
 
-			if (dynAsm == null)
+			if (VitaNexCore.ModuleAssemblies.Contains(_TypeOf.Assembly))
 			{
-				dynAsm =
-					VitaNexCore.ModuleAssemblies.FirstOrDefault(
-						a =>
-						_TypeOf.Assembly != Core.Assembly && !ScriptCompiler.Assemblies.Contains(_TypeOf.Assembly) &&
-						a == _TypeOf.Assembly);
-			}
-
-			if (dynAsm != null && dynAsm.Location.EndsWith(".vnc.mod.dll"))
-			{
-				DynamicAssembly = dynAsm;
+				DynamicAssembly = _TypeOf.Assembly;
 				DynamicAssemblyFile = new FileInfo(DynamicAssembly.Location);
 				_Version = DynamicAssembly.GetName().Version.ToString();
 			}
@@ -629,6 +611,8 @@ namespace VitaNex
 			_SaveMethod = _TypeOf.GetMethod("CMSave", SearchFlags);
 			_EnabledMethod = _TypeOf.GetMethod("CMEnabled", SearchFlags);
 			_DisabledMethod = _TypeOf.GetMethod("CMDisabled", SearchFlags);
+
+			VitaNexCore.RegisterPlugin(this);
 		}
 
 		public void OnRegistered()
@@ -665,103 +649,109 @@ namespace VitaNex
 
 		public void SaveState()
 		{
-			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/States/" + _TypeOf.FullName + ".state", true).Serialize(
-				writer =>
-				{
-					int version = writer.SetVersion(0);
+			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/States/" + _TypeOf.FullName + ".state", true)
+					 .Serialize(
+						 writer =>
+						 {
+							 var version = writer.SetVersion(0);
 
-					switch (version)
-					{
-						case 0:
-							{
-								writer.Write(_Enabled);
-								writer.Write(_Name);
-								writer.Write(_Priority);
-								writer.Write(_Debug);
-								writer.Write(_QuietMode);
-							}
-							break;
-					}
-				});
+							 switch (version)
+							 {
+								 case 0:
+								 {
+									 writer.Write(_Enabled);
+									 writer.Write(_Name);
+									 writer.Write(_Priority);
+									 writer.Write(_Debug);
+									 writer.Write(_Quiet);
+								 }
+									 break;
+							 }
+						 });
 		}
 
 		public void LoadState()
 		{
-			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/States/" + _TypeOf.FullName + ".state").Deserialize(
-				reader =>
-				{
-					if (reader.End())
-					{
-						return;
-					}
+			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/States/" + _TypeOf.FullName + ".state")
+					 .Deserialize(
+						 reader =>
+						 {
+							 if (reader.End())
+							 {
+								 return;
+							 }
 
-					int version = reader.GetVersion();
+							 var version = reader.GetVersion();
 
-					switch (version)
-					{
-						case 0:
-							{
-								_Enabled = reader.ReadBool();
-								_Name = reader.ReadString();
-								_Priority = reader.ReadInt();
-								_Debug = reader.ReadBool();
-								_QuietMode = reader.ReadBool();
+							 switch (version)
+							 {
+								 case 0:
+								 {
+									 _Enabled = reader.ReadBool();
+									 _Name = reader.ReadString();
+									 _Priority = reader.ReadInt();
+									 _Debug = reader.ReadBool();
+									 _Quiet = reader.ReadBool();
 
-								Deferred = !_Enabled;
-							}
-							break;
-					}
-				});
+									 Deferred = !_Enabled;
+								 }
+									 break;
+							 }
+						 });
 		}
 
 		public void SaveOptions()
 		{
-			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/Options/" + _TypeOf.FullName + ".opt", true).Serialize(
-				writer =>
-				{
-					int version = writer.SetVersion(0);
+			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/Options/" + _TypeOf.FullName + ".opt", true)
+					 .Serialize(
+						 writer =>
+						 {
+							 var version = writer.SetVersion(0);
 
-					switch (version)
-					{
-						case 0:
-							writer.WriteType(
-								Options,
-								t =>
-								{
-									if (t != null)
-									{
-										Options.Serialize(writer);
-									}
-								});
-							break;
-					}
-				});
+							 switch (version)
+							 {
+								 case 0:
+								 {
+									 writer.WriteType(
+										 Options,
+										 t =>
+										 {
+											 if (t != null)
+											 {
+												 Options.Serialize(writer);
+											 }
+										 });
+								 }
+									 break;
+							 }
+						 });
 		}
 
 		public void LoadOptions()
 		{
-			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/Options/" + _TypeOf.FullName + ".opt").Deserialize(
-				reader =>
-				{
-					if (reader.End())
-					{
-						return;
-					}
+			IOUtility.EnsureFile(VitaNexCore.CacheDirectory + "/Options/" + _TypeOf.FullName + ".opt")
+					 .Deserialize(
+						 reader =>
+						 {
+							 if (reader.End())
+							 {
+								 return;
+							 }
 
-					int version = reader.GetVersion();
+							 var version = reader.GetVersion();
 
-					switch (version)
-					{
-						case 0:
-							{
-								if (reader.ReadType() != null)
-								{
-									Options.Deserialize(reader);
-								}
-							}
-							break;
-					}
-				});
+							 switch (version)
+							 {
+								 case 0:
+								 {
+									 if (reader.ReadType() != null)
+									 {
+										 Options.Deserialize(reader);
+									 }
+								 }
+									 break;
+							 }
+						 });
 		}
 
 		public Action GetConfigHandler(bool throwException = false)
@@ -911,19 +901,14 @@ namespace VitaNex
 			return null;
 		}
 
-		public int CompareTo(CoreModuleInfo cmi)
-		{
-			return cmi == null ? -1 : _Priority.CompareTo(cmi.Priority);
-		}
-
 		public void ToConsole(string[] lines)
 		{
-			if (QuietMode || lines == null || lines.Length == 0)
+			if (Quiet || lines == null || lines.Length == 0)
 			{
 				return;
 			}
 
-			foreach (string line in lines)
+			foreach (var line in lines)
 			{
 				ToConsole(line);
 			}
@@ -931,7 +916,7 @@ namespace VitaNex
 
 		public void ToConsole(string format, params object[] args)
 		{
-			if (QuietMode)
+			if (Quiet)
 			{
 				return;
 			}
@@ -956,7 +941,7 @@ namespace VitaNex
 				return;
 			}
 
-			foreach (Exception e in errors)
+			foreach (var e in errors)
 			{
 				ToConsole(e);
 			}
@@ -976,8 +961,8 @@ namespace VitaNex
 				Console.Write(Name);
 				Utility.PopColor();
 				Console.Write("]: ");
-				Utility.PushColor(ConsoleColor.DarkRed);
-				Console.WriteLine((QuietMode && !Debug) ? e.Message : e.ToString());
+				Utility.PushColor(ConsoleColor.Red);
+				Console.WriteLine((Quiet && !Debug) ? e.Message : e.ToString());
 				Utility.PopColor();
 			}
 
@@ -986,34 +971,69 @@ namespace VitaNex
 				e.Log(IOUtility.EnsureFile(VitaNexCore.LogsDirectory + "/Debug/" + TypeOf.FullName + ".log"));
 			}
 		}
+
+		public void CompileControlPanel(SuperGump g, int x, int y, int w, int h)
+		{
+			if (Options != null)
+			{
+				Options.CompileControlPanel(g, x, y, w, h);
+			}
+		}
+
+		public override int GetHashCode()
+		{
+			return _TypeOf.GetHashCode();
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is ICorePluginInfo && Equals((ICorePluginInfo)obj);
+		}
+
+		public bool Equals(ICorePluginInfo cp)
+		{
+			return !ReferenceEquals(cp, null) && (ReferenceEquals(cp, this) || cp.TypeOf == _TypeOf);
+		}
+
+		public int CompareTo(ICorePluginInfo cp)
+		{
+			return cp == null || cp.Disposed ? -1 : _Priority.CompareTo(cp.Priority);
+		}
+
+		public override string ToString()
+		{
+			return FullName;
+		}
 	}
 
 	public class CoreModuleOptions : PropertyObject
 	{
+		private CoreModuleInfo _Module;
 		private Type _ModuleType;
 
-		public CoreModuleInfo ModuleInstance { get { return VitaNexCore.GetModule(_ModuleType); } }
+		[CommandProperty(VitaNexCore.Access)]
+		public CoreModuleInfo Module { get { return _Module ?? (_Module = VitaNexCore.GetModule(_ModuleType)); } }
 
 		[CommandProperty(VitaNexCore.Access)]
 		public Type ModuleType { get { return _ModuleType; } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public string ModuleVersion { get { return ModuleInstance.Version; } }
+		public string ModuleName { get { return Module.Name; } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public bool ModuleEnabled { get { return ModuleInstance.Enabled; } set { ModuleInstance.Enabled = value; } }
+		public string ModuleVersion { get { return Module.Version; } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public string ModuleName { get { return ModuleInstance.Name; } set { ModuleInstance.Name = value; } }
+		public bool ModuleEnabled { get { return Module.Enabled; } set { Module.Enabled = value; } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public int ModulePriority { get { return ModuleInstance.Priority; } set { ModuleInstance.Priority = value; } }
+		public int ModulePriority { get { return Module.Priority; } set { Module.Priority = value; } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public bool ModuleDebug { get { return ModuleInstance.Debug; } set { ModuleInstance.Debug = value; } }
+		public bool ModuleDebug { get { return Module.Debug; } set { Module.Debug = value; } }
 
 		[CommandProperty(VitaNexCore.Access)]
-		public bool ModuleQuietMode { get { return ModuleInstance.QuietMode; } set { ModuleInstance.QuietMode = value; } }
+		public bool ModuleQuiet { get { return Module.Quiet; } set { Module.Quiet = value; } }
 
 		public CoreModuleOptions(Type moduleType)
 		{
@@ -1027,34 +1047,37 @@ namespace VitaNex
 		public override void Clear()
 		{
 			ModuleDebug = false;
-			ModuleQuietMode = false;
+			ModuleQuiet = false;
 		}
 
 		public override void Reset()
 		{
 			ModuleDebug = false;
-			ModuleQuietMode = false;
+			ModuleQuiet = false;
 		}
 
 		public virtual void ToConsole(string[] lines)
 		{
-			ModuleInstance.ToConsole(lines);
+			Module.ToConsole(lines);
 		}
 
 		public virtual void ToConsole(string format, params object[] args)
 		{
-			ModuleInstance.ToConsole(format, args);
+			Module.ToConsole(format, args);
 		}
 
 		public virtual void ToConsole(Exception[] errors)
 		{
-			ModuleInstance.ToConsole(errors);
+			Module.ToConsole(errors);
 		}
 
 		public virtual void ToConsole(Exception e)
 		{
-			ModuleInstance.ToConsole(e);
+			Module.ToConsole(e);
 		}
+
+		public virtual void CompileControlPanel(SuperGump g, int x, int y, int w, int h)
+		{ }
 
 		public override string ToString()
 		{
@@ -1067,7 +1090,7 @@ namespace VitaNex
 
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
@@ -1084,7 +1107,7 @@ namespace VitaNex
 
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
@@ -1092,272 +1115,6 @@ namespace VitaNex
 					_ModuleType = reader.ReadType();
 					break;
 			}
-		}
-	}
-
-	public sealed class CoreModuleListGump : ListGump<CoreModuleInfo>
-	{
-		public int VersionHue { get; set; }
-		public int VersionOODHue { get; set; }
-
-		public CoreModuleListGump(PlayerMobile user, Gump parent = null)
-			: base(user, parent, emptyText: "There are no modules to display.", title: "VitaNexCore Modules")
-		{
-			VersionHue = 68;
-			VersionOODHue = 43;
-
-			CanMove = false;
-			CanResize = false;
-
-			Sorted = true;
-			ForceRecompile = true;
-		}
-
-		public override int SortCompare(CoreModuleInfo a, CoreModuleInfo b)
-		{
-			if (a == null && b == null)
-			{
-				return 0;
-			}
-
-			if (b == null)
-			{
-				return -1;
-			}
-
-			if (a == null)
-			{
-				return 1;
-			}
-
-			if (!a.Enabled && !b.Enabled)
-			{
-				return 0;
-			}
-
-			if (!b.Enabled)
-			{
-				return -1;
-			}
-
-			if (!a.Enabled)
-			{
-				return 1;
-			}
-
-			return String.Compare(a.Name, b.Name, StringComparison.Ordinal);
-		}
-
-		public override string GetSearchKeyFor(CoreModuleInfo key)
-		{
-			return key != null ? key.Name : base.GetSearchKeyFor(null);
-		}
-
-		protected override string GetLabelText(int index, int pageIndex, CoreModuleInfo entry)
-		{
-			return entry != null ? entry.Name : base.GetLabelText(index, pageIndex, null);
-		}
-
-		protected override int GetLabelHue(int index, int pageIndex, CoreModuleInfo entry)
-		{
-			return entry != null && entry.Enabled ? entry.Debug ? HighlightHue : TextHue : ErrorHue;
-		}
-
-		protected override void CompileList(List<CoreModuleInfo> list)
-		{
-			list.Clear();
-			list.AddRange(VitaNexCore.CoreModules);
-
-			base.CompileList(list);
-		}
-
-		protected override void CompileMenuOptions(MenuGumpOptions list)
-		{
-			list.AppendEntry(new ListGumpEntry("Save All", VitaNexCore.SaveModules, HighlightHue));
-
-			base.CompileMenuOptions(list);
-		}
-
-		protected override void SelectEntry(GumpButton button, CoreModuleInfo entry)
-		{
-			base.SelectEntry(button, entry);
-
-			if (button == null || entry == null)
-			{
-				return;
-			}
-
-			var list = new MenuGumpOptions();
-
-			list.AppendEntry(
-				new ListGumpEntry(
-					"Properties",
-					b =>
-					{
-						Refresh(true);
-						User.SendGump(new PropertiesGump(User, entry));
-					},
-					HighlightHue));
-
-			if (entry.Enabled)
-			{
-				list.Replace(
-					"Enable",
-					new ListGumpEntry(
-						"Disable",
-						b =>
-						Send(
-							new ConfirmDialogGump(
-								User,
-								this,
-								title: "Disable Module?",
-								html: "Disable Module: " + entry.Name + "\nDo you want to continue?",
-								onAccept: a =>
-								{
-									entry.Enabled = false;
-									Refresh(true);
-								},
-								onCancel: Refresh)),
-						HighlightHue));
-			}
-			else
-			{
-				list.Replace(
-					"Disable",
-					new ListGumpEntry(
-						"Enable",
-						b =>
-						Send(
-							new ConfirmDialogGump(
-								User,
-								this,
-								title: "Enable Module?",
-								html: "Enable Module: '" + entry.Name + "'\nDo you want to continue?",
-								onAccept: a =>
-								{
-									entry.Enabled = true;
-									Refresh(true);
-								},
-								onCancel: Refresh)),
-						HighlightHue));
-			}
-
-			if (entry.Enabled)
-			{
-				if (entry.Debug)
-				{
-					list.Replace(
-						"Enable Debug",
-						new ListGumpEntry(
-							"Debug Disable",
-							b =>
-							Send(
-								new ConfirmDialogGump(
-									User,
-									this,
-									title: "Disable Module Debugging?",
-									html: "Disable Module Debugging: " + entry.Name + "\nDo you want to continue?",
-									onAccept: a =>
-									{
-										entry.Debug = false;
-										Refresh(true);
-									},
-									onCancel: Refresh)),
-							HighlightHue));
-				}
-				else
-				{
-					list.Replace(
-						"Disable Debug",
-						new ListGumpEntry(
-							"Enable Debug",
-							b =>
-							Send(
-								new ConfirmDialogGump(
-									User,
-									this,
-									title: "Enable Module Debugging?",
-									html: "Enable Module Debugging: '" + entry.Name + "'\nDo you want to continue?",
-									onAccept: a =>
-									{
-										entry.Debug = true;
-										Refresh(true);
-									},
-									onCancel: Refresh)),
-							HighlightHue));
-				}
-
-				if (entry.SaveSupported)
-				{
-					list.AppendEntry(
-						new ListGumpEntry(
-							"Save",
-							b =>
-							{
-								VitaNexCore.SaveModule(entry);
-								Refresh(true);
-							},
-							HighlightHue));
-				}
-				else
-				{
-					list.RemoveEntry("Save");
-				}
-
-				if (entry.LoadSupported)
-				{
-					list.AppendEntry(
-						new ListGumpEntry(
-							"Load",
-							b =>
-							Send(
-								new ConfirmDialogGump(
-									User,
-									this,
-									title: "Load Module Data?",
-									html:
-										"Loading a modules' saved data after it has been started may yield unexpected results.\nDo you want to continue?",
-									onAccept: a =>
-									{
-										VitaNexCore.LoadModule(entry);
-										Refresh(true);
-									},
-									onCancel: Refresh)),
-							HighlightHue));
-				}
-				else
-				{
-					list.RemoveEntry("Load");
-				}
-			}
-			else
-			{
-				list.RemoveEntry("Save");
-				list.RemoveEntry("Load");
-				list.RemoveEntry("Enable Debug");
-				list.RemoveEntry("Disable Debug");
-			}
-
-			Send(new MenuGump(User, Refresh(), list, button));
-		}
-
-		protected override void CompileEntryLayout(
-			SuperGumpLayout layout, int length, int index, int pIndex, int yOffset, CoreModuleInfo entry)
-		{
-			base.CompileEntryLayout(layout, length, index, pIndex, yOffset, entry);
-
-			layout.AddReplace(
-				"label/list/entry/" + index,
-				() =>
-				{
-					Version versionA = entry.Version, versionB = entry.Version;
-
-					AddLabelCropped(65, 2 + yOffset, 150, 20, GetLabelHue(index, pIndex, entry), GetLabelText(index, pIndex, entry));
-					AddLabelCropped(225, 2 + yOffset, 50, 20, (versionA < versionB) ? VersionOODHue : VersionHue, versionA.ToString(4));
-					AddLabelCropped(285, 2 + yOffset, 50, 20, VersionHue, versionB.ToString(4));
-					AddLabelCropped(
-						345, 2 + yOffset, 60, 20, entry.Enabled ? HighlightHue : ErrorHue, entry.Enabled ? "Enabled" : "Disabled");
-				});
 		}
 	}
 }

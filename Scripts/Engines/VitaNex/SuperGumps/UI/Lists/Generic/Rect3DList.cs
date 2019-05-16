@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -15,7 +15,6 @@ using System.Collections.Generic;
 
 using Server;
 using Server.Gumps;
-using Server.Mobiles;
 
 using VitaNex.Network;
 #endregion
@@ -36,7 +35,7 @@ namespace VitaNex.SuperGumps.UI
 		private RegionExtUtility.PreviewRegion _Preview;
 
 		public Rect3DListGump(
-			PlayerMobile user,
+			Mobile user,
 			Gump parent = null,
 			int? x = null,
 			int? y = null,
@@ -121,7 +120,7 @@ namespace VitaNex.SuperGumps.UI
 
 		public override Rectangle3D GetListAddObject()
 		{
-			return InputRect != null ? InputRect.Value : default(Rectangle3D);
+			return InputRect ?? default(Rectangle3D);
 		}
 
 		protected override void OnSend()
@@ -156,7 +155,7 @@ namespace VitaNex.SuperGumps.UI
 		{
 			base.CompileEntryOptions(opts, entry);
 
-			opts.AppendEntry(new ListGumpEntry("Go To", () => User.MoveToWorld(entry.Start, InputMap), HighlightHue));
+			opts.AppendEntry("Go To", () => User.MoveToWorld(entry.Start, InputMap), HighlightHue);
 		}
 
 		public virtual void ClearPreview()
@@ -195,7 +194,12 @@ namespace VitaNex.SuperGumps.UI
 			}
 
 			_Preview = RegionExtUtility.DisplayPreview(
-				PreviewName, InputMap, PreviewHue, PreviewEffect, PreviewRender, List.ToArray());
+				PreviewName,
+				InputMap,
+				PreviewHue,
+				PreviewEffect,
+				PreviewRender,
+				List.ToArray());
 		}
 
 		protected override void CompileMenuOptions(MenuGumpOptions list)
@@ -204,29 +208,27 @@ namespace VitaNex.SuperGumps.UI
 			{
 				list.Replace(
 					"Disable Preview",
-					new ListGumpEntry(
-						"Enable Preview",
-						() =>
-						{
-							Preview = true;
-							DisplayPreview();
-							Refresh();
-						},
-						HighlightHue));
+					"Enable Preview",
+					() =>
+					{
+						Preview = true;
+						DisplayPreview();
+						Refresh();
+					},
+					HighlightHue);
 			}
 			else
 			{
 				list.Replace(
 					"Enable Preview",
-					new ListGumpEntry(
-						"Disable Preview",
-						() =>
-						{
-							Preview = false;
-							ClearPreview();
-							Refresh();
-						},
-						ErrorHue));
+					"Disable Preview",
+					() =>
+					{
+						Preview = false;
+						ClearPreview();
+						Refresh();
+					},
+					ErrorHue);
 			}
 
 			base.CompileMenuOptions(list);

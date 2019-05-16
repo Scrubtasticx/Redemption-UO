@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -11,36 +11,72 @@
 
 #region References
 using System;
+using System.Text;
 
 using Server;
 using Server.Accounting;
-using Server.Items;
+
+using VitaNex.IO;
 #endregion
 
 namespace VitaNex.Modules.AutoDonate
 {
-	public enum DonationTransactionState
+	[PropertyObject]
+	public sealed class DonationTransaction : IEquatable<DonationTransaction>, IComparable<DonationTransaction>
 	{
-		Void = 0,
-		Pending,
-		Processed,
-		Claimed
-	}
+		private static void Protect(Item item)
+		{
+			var flags = ScriptCompiler.FindTypeByFullName("Server.Items.ItemFlags");
 
-	public sealed class DonationTransaction
-	{
-		private DonationCredits _Credit;
-		private string _Extra;
-		private int _InternalVersion;
-		private string _Notes;
+			if (flags != null)
+			{
+				flags.CallMethod("SetStealable", item, false);
+			}
+		}
 
-		private DonationTransactionState _State;
-		private TimeStamp _Time;
-
+		[CommandProperty(AutoDonate.Access, true)]
 		public string ID { get; private set; }
-		public int Version { get; private set; }
 
-		public DonationTransactionState State
+		[CommandProperty(AutoDonate.Access, true)]
+		public IAccount Account { get; private set; }
+
+		[CommandProperty(AutoDonate.Access, true)]
+		public bool Deleted { get; private set; }
+
+		[CommandProperty(AutoDonate.Access, true)]
+		public int Version { get; set; }
+
+		[CommandProperty(AutoDonate.Access, true)]
+		public TimeStamp Time { get; set; }
+
+		[CommandProperty(AutoDonate.Access, true)]
+		public string Email { get; set; }
+
+		[CommandProperty(AutoDonate.Access, true)]
+		public double Total { get; set; }
+
+		[CommandProperty(AutoDonate.Access, true)]
+		public long Bonus { get; set; }
+
+		[CommandProperty(AutoDonate.Access)]
+		public long Credit { get; set; }
+
+		[CommandProperty(AutoDonate.Access)]
+		public string Notes { get; set; }
+
+		[CommandProperty(AutoDonate.Access)]
+		public string Extra { get; set; }
+
+		[CommandProperty(AutoDonate.Access)]
+		public TimeStamp DeliveryTime { get; set; }
+
+		[CommandProperty(AutoDonate.Access)]
+		public string DeliveredTo { get; set; }
+
+		private TransactionState _State;
+
+		[CommandProperty(AutoDonate.Access)]
+		public TransactionState State
 		{
 			get { return _State; }
 			set
@@ -50,90 +86,54 @@ namespace VitaNex.Modules.AutoDonate
 					return;
 				}
 
-				DonationTransactionState oldState = _State, newState = value;
+				var old = _State;
 
-				_State = newState;
-				Version = _InternalVersion + 1;
+				_State = value;
 
-				OnStateChanged(oldState);
+				OnStateChanged(old);
 			}
 		}
 
-		public IAccount Account { get; private set; }
-		public string Email { get; private set; }
-		public decimal Total { get; private set; }
+		public TransactionState InternalState { get { return State; } set { _State = value; } }
 
-		public DonationCredits Credit
-		{
-			get { return _Credit; }
-			set
-			{
-				_Credit = value;
-				Version = _InternalVersion + 1;
-			}
-		}
+		[CommandProperty(AutoDonate.Access)]
+		public bool Hidden { get { return (IsClaimed || IsVoided) && !AutoDonate.CMOptions.ShowHistory; } }
 
-		public TimeStamp Time
-		{
-			get { return _Time; }
-			set
-			{
-				_Time = value;
-				Version = _InternalVersion + 1;
-			}
-		}
+		[CommandProperty(AutoDonate.Access)]
+		public long CreditTotal { get { return Credit + Bonus; } }
 
-		public string Notes
-		{
-			get { return _Notes; }
-			set
-			{
-				_Notes = value;
-				Version = _InternalVersion + 1;
-			}
-		}
+		public bool IsClaimed { get { return State == TransactionState.Claimed; } }
+		public bool IsPending { get { return State == TransactionState.Pending; } }
+		public bool IsProcessed { get { return State == TransactionState.Processed; } }
+		public bool IsVoided { get { return State == TransactionState.Voided; } }
 
-		public string Extra
-		{
-			get { return _Extra; }
-			set
-			{
-				_Extra = value;
-				Version = _InternalVersion + 1;
-			}
-		}
-
-		public Mobile DeliverFrom { get; private set; }
-		public Mobile DeliverTo { get; private set; }
-		public TimeStamp DeliveryTime { get; private set; }
-
-		public bool IsGift { get { return DeliverFrom != null && DeliverFrom != DeliverTo; } }
-
-		public bool Hidden { get; set; }
+		public string FullPath { get { return String.Format("{0}|{1}|{2}", Time.Value.Year, Time.Value.GetMonth(), ID); } }
 
 		public DonationTransaction(
 			string id,
-			DonationTransactionState state,
 			IAccount account,
 			string email,
-			decimal total,
-			DonationCredits credit,
-			TimeStamp time,
-			int version = 0,
-			string notes = null,
-			string extra = null)
+			double total,
+			long credit,
+			string notes,
+			string extra)
 		{
+			Version = 0;
+			Time = TimeStamp.Now;
+
 			ID = id;
-			_State = state;
+
 			Account = account;
 			Email = email;
 			Total = total;
-			_Credit = credit;
-			_Time = time;
-			Version = version;
-			_InternalVersion = version;
-			_Notes = notes ?? String.Empty;
-			_Extra = extra ?? String.Empty;
+
+			Credit = credit;
+			Bonus = 0;
+
+			Notes = notes;
+			Extra = extra;
+
+			_State = TransactionState.Pending;
 		}
 
 		public DonationTransaction(GenericReader reader)
@@ -141,233 +141,422 @@ namespace VitaNex.Modules.AutoDonate
 			Deserialize(reader);
 		}
 
-		private void OnStateChanged(DonationTransactionState oldState)
+		private void OnStateChanged(TransactionState oldState)
 		{
 			DonationEvents.InvokeStateChanged(this, oldState);
 		}
 
-		public bool Process()
-		{
-			if ((State = DonationTransactionState.Processed) == DonationTransactionState.Processed)
-			{
-				DonationEvents.InvokeTransProcessed(this);
-				return true;
-			}
-
-			return false;
-		}
-
 		public bool Void()
 		{
-			if ((State = DonationTransactionState.Void) == DonationTransactionState.Void)
+			if (State == TransactionState.Voided)
 			{
-				if (!AutoDonate.CMOptions.ShowHistory)
-				{
-					Hidden = true;
-				}
+				return true;
+			}
+
+			if ((State = TransactionState.Voided) == TransactionState.Voided)
+			{
+				++Version;
 
 				DonationEvents.InvokeTransVoided(this);
+
+				LogToFile();
+
 				return true;
 			}
 
 			return false;
 		}
 
-		public bool Claim(Mobile from, Mobile to)
+		public bool Process()
 		{
-			return Claim(from, to, String.Empty);
-		}
-
-		public bool Claim(Mobile from, Mobile to, string message, params object[] args)
-		{
-			if (from != null && to != null &&
-				((from.Player && from.Account == Account) || from.AccessLevel >= AccessLevel.Administrator))
+			if (State == TransactionState.Processed)
 			{
-				DeliverFrom = from;
-				DeliverTo = to;
-				DeliveryTime = TimeStamp.UtcNow;
-
-				if (Deliver(message, args))
-				{
-					DonationEvents.InvokeTransDelivered(this);
-
-					if (!AutoDonate.CMOptions.ShowHistory)
-					{
-						Hidden = true;
-					}
-
-					State = DonationTransactionState.Claimed;
-					DonationEvents.InvokeTransClaimed(this);
-					return true;
-				}
-
-				DeliverFrom = null;
-				DeliverTo = null;
-				DeliveryTime = TimeStamp.Zero;
+				return true;
 			}
 
-			return false;
-		}
-
-		private bool Deliver()
-		{
-			return Deliver(String.Empty);
-		}
-
-		private bool Deliver(string message, params object[] args)
-		{
-			IAccount a = DeliverTo.Account;
-
-			if (a == null)
+			if (State != TransactionState.Pending)
 			{
 				return false;
 			}
 
-			if (AutoDonate.Find(a) == null)
+			if ((State = TransactionState.Processed) == TransactionState.Processed)
 			{
-				AutoDonate.Register(a, new DonationProfile(a));
+				++Version;
+
+				DonationEvents.InvokeTransProcessed(this);
+
+				LogToFile();
+
+				return true;
 			}
 
-			AutoDonate.Profiles[a].Credits += _Credit;
-
-			if (IsGift)
-			{
-				AutoDonate.Profiles[a].AddGift(this, message, args);
-			}
-
-			return DeliveryConversion();
+			return false;
 		}
 
-		private bool DeliveryConversion()
+		public bool Claim(Mobile m)
 		{
-			const int amountCap = 60000;
-
-			double exchangeRate = AutoDonate.CMOptions.ExchangeRate;
-			DonationProfile dp = AutoDonate.Find(DeliverTo.Account);
-			Container bank = DeliverTo.BankBox;
-
-			if (bank != null)
+			if (State == TransactionState.Claimed)
 			{
-				Bag bag = new Bag();
-
-				if (IsGift)
-				{
-					bag.Name = "A Donation Gift Bag";
-					bag.Hue = 1152;
-
-					string text = dp.Gifts.ContainsKey(ID) ? dp.Gifts[ID] : null;
-
-					if (String.IsNullOrWhiteSpace(text))
-					{
-						text = "Hi, " + DeliverTo.RawName + ", ";
-						text += "Here is a gift, a token of my appreciation. ";
-						text += "Don't spend it all in one place! ";
-						text += "Regards, " + DeliverFrom.RawName;
-					}
-
-					bag.DropItem(new DonationGiftBook(DeliverFrom, text));
-				}
-				else
-				{
-					bag.Name = "A Donation Reward Bag";
-					bag.Hue = 1152;
-				}
-
-				long exchanged = (long)(Credit * exchangeRate);
-
-				while (exchanged >= amountCap)
-				{
-					Item cur = AutoDonate.CMOptions.CurrencyType.CreateInstance();
-					cur.Amount = amountCap;
-
-					bag.DropItem(cur);
-
-					if (cur.IsChildOf(bag))
-					{
-						exchanged -= cur.Amount;
-					}
-				}
-
-				if (exchanged > 0)
-				{
-					Item cur = AutoDonate.CMOptions.CurrencyType.CreateInstance();
-					cur.Amount = (int)exchanged;
-
-					bag.DropItem(cur);
-
-					if (cur.IsChildOf(bag))
-					{
-						exchanged -= cur.Amount;
-					}
-				}
-
-				if (exchanged > 0)
-				{
-					bag.Delete();
-					return false;
-				}
-
-				bank.DropItem(bag);
-				dp.Credits -= Credit;
+				return true;
 			}
 
-			return true;
+			if (State != TransactionState.Processed)
+			{
+				return false;
+			}
+
+			if ((State = TransactionState.Claimed) == TransactionState.Claimed)
+			{
+				Deliver(m);
+				DeliveredTo = m.RawName;
+				DeliveryTime = TimeStamp.Now;
+
+				++Version;
+
+				DonationEvents.InvokeTransClaimed(this, m);
+
+				LogToFile();
+
+				return true;
+			}
+
+			return false;
+		}
+
+		public long GetCredit(DonationProfile dp, out long credit, out long bonus)
+		{
+			return GetCredit(dp, false, out credit, out bonus);
+		}
+
+		private long GetCredit(DonationProfile dp, bool delivering, out long credit, out long bonus)
+		{
+			if (!delivering && State != TransactionState.Processed)
+			{
+				return (credit = Credit) + (bonus = Bonus);
+			}
+
+			var total = DonationEvents.InvokeTransExchange(this, dp);
+
+			if (AutoDonate.CMOptions.CreditBonus > 0)
+			{
+				total += (long)Math.Floor(Credit * AutoDonate.CMOptions.CreditBonus);
+			}
+
+			bonus = Math.Max(0, total - Credit);
+			credit = Math.Max(0, total - bonus);
+
+			return total;
+		}
+
+		private void Deliver(Mobile m)
+		{
+			if (m == null || m.Account == null)
+			{
+				return;
+			}
+
+			if (Account != m.Account)
+			{
+				SetAccount(m.Account);
+			}
+
+			var dp = AutoDonate.EnsureProfile(Account);
+
+			if (dp == null)
+			{
+				return;
+			}
+
+			long credit, bonus;
+			var total = GetCredit(dp, true, out credit, out bonus);
+
+			Credit = credit;
+			Bonus = bonus;
+
+			var bag = DonationEvents.InvokeTransPack(this, dp);
+
+			if (bag == null || bag.Deleted)
+			{
+				dp.Credit += total;
+				return;
+			}
+
+			Protect(bag);
+
+			while (credit > 0)
+			{
+				var cur = AutoDonate.CMOptions.CurrencyType.CreateInstance();
+
+				if (cur == null)
+				{
+					bag.Delete();
+					break;
+				}
+
+				Protect(cur);
+
+				if (cur.Stackable)
+				{
+					cur.Amount = (int)Math.Min(credit, 60000);
+				}
+
+				credit -= cur.Amount;
+
+				bag.DropItem(cur);
+			}
+
+			if (bag.Deleted)
+			{
+				dp.Credit += total;
+				return;
+			}
+
+			while (bonus > 0)
+			{
+				var cur = AutoDonate.CMOptions.CurrencyType.CreateInstance();
+
+				if (cur == null)
+				{
+					bag.Delete();
+					break;
+				}
+
+				Protect(cur);
+
+				cur.Name = String.Format("{0} [Bonus]", cur.ResolveName(m));
+
+				if (cur.Stackable)
+				{
+					cur.Amount = (int)Math.Min(bonus, 60000);
+				}
+
+				bonus -= cur.Amount;
+
+				bag.DropItem(cur);
+			}
+
+			if (bag.Deleted || bag.GiveTo(m, GiveFlags.PackBankDelete) == GiveFlags.Delete)
+			{
+				dp.Credit += total;
+			}
+		}
+
+		public void SetAccount(IAccount acc)
+		{
+			if (Account == acc)
+			{
+				return;
+			}
+
+			++Version;
+
+			Extra += "{ACCOUNT CHANGED FROM '" + Account + "' TO '" + acc + "'}";
+
+			var profile = AutoDonate.FindProfile(Account);
+
+			if (profile != null)
+			{
+				profile.Remove(this);
+			}
+
+			Account = acc;
+
+			profile = AutoDonate.EnsureProfile(Account);
+
+			if (profile != null)
+			{
+				profile.Add(this);
+			}
+
+			LogToFile();
+		}
+
+		public void Delete()
+		{
+			if (Deleted)
+			{
+				return;
+			}
+
+			Deleted = true;
+
+			AutoDonate.Transactions.Remove(ID);
+
+			DonationEvents.InvokeTransactionDeleted(this);
+
+			DeliveredTo = null;
+			SetAccount(null);
+		}
+
+		public override int GetHashCode()
+		{
+			return ID.GetHashCode();
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is DonationTransaction && Equals((DonationTransaction)obj);
+		}
+
+		public bool Equals(DonationTransaction other)
+		{
+			return other != null && String.Equals(ID, other.ID);
+		}
+
+		public int CompareTo(DonationTransaction other)
+		{
+			var res = 0;
+
+			if (this.CompareNull(other, ref res))
+			{
+				return res;
+			}
+
+			return TimeStamp.Compare(Time, other.Time);
+		}
+
+		public override string ToString()
+		{
+			return ID;
+		}
+
+		public void LogToFile()
+		{
+			var file = IOUtility.EnsureFile(VitaNexCore.LogsDirectory + "/Donations/" + ID + ".log");
+
+			var sb = new StringBuilder();
+
+			sb.AppendLine();
+			sb.AppendLine(new String('*', 80));
+			sb.AppendLine();
+			sb.AppendLine("{0}:		{1}", file.Exists ? "UPDATED" : "CREATED", DateTime.Now);
+			sb.AppendLine();
+			sb.AppendLine("ID:			{0}", ID);
+			sb.AppendLine("State:		{0}", State);
+			sb.AppendLine("Time:		{0}", Time.Value);
+			sb.AppendLine("Version:		{0:#,0}", Version);
+			sb.AppendLine();
+			sb.AppendLine("Account:		{0}", Account);
+			sb.AppendLine("Email:		{0}", Email);
+			sb.AppendLine();
+			sb.AppendLine("Total:		{0}{1} {2}", AutoDonate.CMOptions.MoneySymbol, Total, AutoDonate.CMOptions.MoneyAbbr);
+			sb.AppendLine("Credit:		{0:#,0} {1}", Credit, AutoDonate.CMOptions.CurrencyName);
+			sb.AppendLine("Bonus:		{0:#,0} {1}", Bonus, AutoDonate.CMOptions.CurrencyName);
+
+			if (DeliveredTo != null)
+			{
+				sb.AppendLine();
+				sb.AppendLine("Delivered:	{0}", DeliveryTime.Value);
+				sb.AppendLine("Recipient:	{0}", DeliveredTo);
+			}
+
+			if (!String.IsNullOrWhiteSpace(Notes))
+			{
+				sb.AppendLine();
+				sb.AppendLine("Notes:");
+				sb.AppendLine(Notes);
+			}
+
+			if (!String.IsNullOrWhiteSpace(Extra))
+			{
+				sb.AppendLine();
+				sb.AppendLine("Extra:");
+				sb.AppendLine(Extra);
+			}
+
+			sb.Log(file);
 		}
 
 		public void Serialize(GenericWriter writer)
 		{
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(3);
 
 			switch (version)
 			{
+				case 3:
+					writer.Write(Deleted);
+					goto case 2;
+				case 2:
+				case 1:
+					writer.Write(Bonus);
+					goto case 0;
 				case 0:
-					{
-						writer.Write(ID);
-						writer.WriteFlag(_State);
-						writer.Write(Account);
-						writer.Write(Email);
-						writer.Write(Total);
-						writer.Write(_Credit);
-						writer.Write(_Time.Stamp);
-						writer.Write(Version);
-						writer.Write(_InternalVersion);
-						writer.Write(_Notes);
-						writer.Write(_Extra);
+				{
+					writer.Write(ID);
+					writer.WriteFlag(_State);
+					writer.Write(Account);
+					writer.Write(Email);
+					writer.Write(Total);
+					writer.Write(Credit);
+					writer.Write(Time);
+					writer.Write(Version);
 
-						writer.Write(DeliverFrom);
-						writer.Write(DeliverTo);
+					writer.Write(Notes);
+					writer.Write(Extra);
 
-						writer.Write(DeliveryTime.Stamp);
-					}
+					writer.Write(DeliveredTo);
+					writer.Write(DeliveryTime);
+				}
 					break;
 			}
 		}
 
 		public void Deserialize(GenericReader reader)
 		{
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
+				case 3:
+					Deleted = reader.ReadBool();
+					goto case 2;
+				case 2:
+				case 1:
+					Bonus = reader.ReadLong();
+					goto case 0;
 				case 0:
+				{
+					ID = reader.ReadString();
+					_State = reader.ReadFlag<TransactionState>();
+					Account = reader.ReadAccount();
+					Email = reader.ReadString();
+					Total = reader.ReadDouble();
+					Credit = reader.ReadLong();
+
+					Time = version > 0 ? reader.ReadTimeStamp() : reader.ReadDouble();
+
+					Version = reader.ReadInt();
+
+					if (version < 1)
 					{
-						ID = reader.ReadString();
-						_State = reader.ReadFlag<DonationTransactionState>();
-						Account = reader.ReadAccount();
-						Email = reader.ReadString();
-						Total = reader.ReadDecimal();
-						_Credit = reader.ReadLong();
-						_Time = reader.ReadDouble();
-						Version = reader.ReadInt();
-						_InternalVersion = reader.ReadInt();
-						_Notes = reader.ReadString();
-						_Extra = reader.ReadString();
+						reader.ReadInt(); // InternalVersion
+					}
 
-						DeliverFrom = reader.ReadMobile();
-						DeliverTo = reader.ReadMobile();
+					Notes = reader.ReadString();
+					Extra = reader.ReadString();
 
+					if (version > 1)
+					{
+						DeliveredTo = reader.ReadString();
+						DeliveryTime = reader.ReadTimeStamp();
+					}
+					else if (version > 0)
+					{
+						var m = reader.ReadMobile();
+
+						DeliveredTo = m != null ? m.RawName : null;
+						DeliveryTime = reader.ReadTimeStamp();
+					}
+					else
+					{
+						reader.ReadMobile(); // DeliverFrom
+
+						var m = reader.ReadMobile();
+
+						DeliveredTo = m != null ? m.RawName : null;
 						DeliveryTime = reader.ReadDouble();
 					}
+				}
 					break;
 			}
 		}

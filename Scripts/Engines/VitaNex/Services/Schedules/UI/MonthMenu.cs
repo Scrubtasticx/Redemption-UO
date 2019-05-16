@@ -3,17 +3,15 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
-using System;
-
+using Server;
 using Server.Gumps;
-using Server.Mobiles;
 
 using VitaNex.SuperGumps.UI;
 #endregion
@@ -22,8 +20,16 @@ namespace VitaNex.Schedules
 {
 	public class ScheduleMonthsMenuGump : MenuGump
 	{
+		public Schedule Schedule { get; set; }
+
+		public bool UseConfirmDialog { get; set; }
+
 		public ScheduleMonthsMenuGump(
-			PlayerMobile user, Schedule schedule, Gump parent = null, GumpButton clicked = null, bool useConfirm = true)
+			Mobile user,
+			Schedule schedule,
+			Gump parent = null,
+			GumpButton clicked = null,
+			bool useConfirm = true)
 			: base(user, parent, clicked: clicked)
 		{
 			Schedule = schedule;
@@ -33,29 +39,26 @@ namespace VitaNex.Schedules
 			CanResize = false;
 		}
 
-		public Schedule Schedule { get; set; }
-		public bool UseConfirmDialog { get; set; }
-
 		protected override void CompileOptions(MenuGumpOptions list)
 		{
-			list.AppendEntry(new ListGumpEntry("None", b => SetMonth(b, ScheduleMonths.None)));
-			list.AppendEntry(new ListGumpEntry("All", b => SetMonth(b, ScheduleMonths.All)));
-			list.AppendEntry(new ListGumpEntry("January", b => SetMonth(b, ScheduleMonths.January)));
-			list.AppendEntry(new ListGumpEntry("February", b => SetMonth(b, ScheduleMonths.February)));
-			list.AppendEntry(new ListGumpEntry("March", b => SetMonth(b, ScheduleMonths.March)));
-			list.AppendEntry(new ListGumpEntry("April", b => SetMonth(b, ScheduleMonths.April)));
-			list.AppendEntry(new ListGumpEntry("May", b => SetMonth(b, ScheduleMonths.May)));
-			list.AppendEntry(new ListGumpEntry("June", b => SetMonth(b, ScheduleMonths.June)));
-			list.AppendEntry(new ListGumpEntry("July", b => SetMonth(b, ScheduleMonths.July)));
-			list.AppendEntry(new ListGumpEntry("August", b => SetMonth(b, ScheduleMonths.August)));
-			list.AppendEntry(new ListGumpEntry("September", b => SetMonth(b, ScheduleMonths.September)));
-			list.AppendEntry(new ListGumpEntry("October", b => SetMonth(b, ScheduleMonths.October)));
-			list.AppendEntry(new ListGumpEntry("November", b => SetMonth(b, ScheduleMonths.November)));
-			list.AppendEntry(new ListGumpEntry("December", b => SetMonth(b, ScheduleMonths.December)));
+			list.AppendEntry("None", b => SetMonth(b, ScheduleMonths.None));
+			list.AppendEntry("All", b => SetMonth(b, ScheduleMonths.All));
+			list.AppendEntry("January", b => SetMonth(b, ScheduleMonths.January));
+			list.AppendEntry("February", b => SetMonth(b, ScheduleMonths.February));
+			list.AppendEntry("March", b => SetMonth(b, ScheduleMonths.March));
+			list.AppendEntry("April", b => SetMonth(b, ScheduleMonths.April));
+			list.AppendEntry("May", b => SetMonth(b, ScheduleMonths.May));
+			list.AppendEntry("June", b => SetMonth(b, ScheduleMonths.June));
+			list.AppendEntry("July", b => SetMonth(b, ScheduleMonths.July));
+			list.AppendEntry("August", b => SetMonth(b, ScheduleMonths.August));
+			list.AppendEntry("September", b => SetMonth(b, ScheduleMonths.September));
+			list.AppendEntry("October", b => SetMonth(b, ScheduleMonths.October));
+			list.AppendEntry("November", b => SetMonth(b, ScheduleMonths.November));
+			list.AppendEntry("December", b => SetMonth(b, ScheduleMonths.December));
 
 			base.CompileOptions(list);
 
-			list.Replace("Cancel", new ListGumpEntry("Done", Cancel));
+			list.Replace("Cancel", "Done", Cancel);
 		}
 
 		protected override int GetLabelHue(int index, int pageIndex, ListGumpEntry entry)
@@ -117,7 +120,8 @@ namespace VitaNex.Schedules
 					break;
 			}
 
-			Schedule.InvalidateNextTick(DateTime.UtcNow);
+			Schedule.InvalidateNextTick();
+
 			Refresh(true);
 		}
 	}

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -16,9 +16,9 @@ using System.IO;
 using System.Linq;
 
 using Server;
+using Server.Mobiles;
 using Server.Network;
 
-using VitaNex.IO;
 using VitaNex.Network;
 #endregion
 
@@ -32,48 +32,18 @@ namespace VitaNex.Modules.EquipmentSets
 
 		public static EquipmentSetsOptions CMOptions { get; private set; }
 
-		public static BinaryDataStore<Type, EquipmentSet> Sets { get; private set; }
+		public static Type[] SetTypes { get; private set; }
+
+		public static Dictionary<Type, EquipmentSet> Sets { get; private set; }
 
 		public static OutgoingPacketOverrideHandler EquipItemParent { get; private set; }
+		public static OutgoingPacketOverrideHandler EquipItemParent6017 { get; private set; }
+
+		public static PacketHandler EquipItemRequestParent { get; private set; }
+		public static PacketHandler EquipItemRequestParent6017 { get; private set; }
 
 		public static PacketHandler DropItemRequestParent { get; private set; }
 		public static PacketHandler DropItemRequestParent6017 { get; private set; }
-		public static PacketHandler EquipItemRequestParent { get; private set; }
-
-		public static void Sync()
-		{
-			VitaNexCore.TryCatch(
-				() =>
-				{
-					int added = 0;
-
-					foreach (var t in TypeOfEquipmentSet.GetConstructableChildren())
-					{
-						Sets.AddOrReplace(
-							t,
-							set =>
-							{
-								if (set == null)
-								{
-									set = t.CreateInstanceSafe<EquipmentSet>();
-
-									if (set != null)
-									{
-										++added;
-									}
-								}
-
-								return set;
-							});
-					}
-
-					if (added > 0)
-					{
-						CMOptions.ToConsole("{0:#,0} new sets added.", added);
-					}
-				},
-				CMOptions.ToConsole);
-		}
 
 		private static void OnLogin(LoginEventArgs e)
 		{
@@ -85,7 +55,8 @@ namespace VitaNex.Modules.EquipmentSets
 
 		private static void GetProperties(Item item, Mobile viewer, ExtendedOPL list)
 		{
-			if (!CMOptions.ModuleEnabled || item == null || item.Deleted || !item.Layer.IsEquip() || list == null)
+			if (!CMOptions.ModuleEnabled || item == null || item.Deleted || !item.Layer.IsEquip() || list == null ||
+				World.Loading)
 			{
 				return;
 			}
@@ -100,18 +71,26 @@ namespace VitaNex.Modules.EquipmentSets
 				return;
 			}
 
-			Type itemType = item.GetType();
-			bool equipped = item.IsEquipped();
+			var itemType = item.GetType();
+			var equipped = item.IsEquipped() || item.IsShopItem();
 
-			foreach (EquipmentSet set in
-				FindSetsFor(itemType)
-					.Where(s => s.Display && !s.Parts.Any(p => p.Valid && p.Display && p.IsTypeOf(itemType) && !p.DisplaySet)))
+			var parent = item.Parent as Mobile;
+
+			var npc = parent != null && ((parent is BaseCreature || !parent.Player) && !parent.IsControlled<PlayerMobile>());
+
+			foreach (var set in FindSetsFor(itemType)
+				.Where(s => s.Display && !s.Parts.Any(p => p.Display && p.IsTypeOf(itemType) && !p.DisplaySet)))
 			{
 				set.GetProperties(viewer, list, equipped);
 
+				if (npc)
+				{
+					continue;
+				}
+
 				if (set.DisplayParts)
 				{
-					foreach (EquipmentSetPart part in set.Parts.Where(p => p.Valid && p.Display))
+					foreach (var part in set.Parts.Where(p => p.Display))
 					{
 						part.GetProperties(viewer, list, equipped);
 					}
@@ -122,7 +101,7 @@ namespace VitaNex.Modules.EquipmentSets
 					continue;
 				}
 
-				foreach (EquipmentSetMod mod in set.Mods.Where(mod => mod.Valid && mod.Display))
+				foreach (var mod in set.Mods.Where(mod => mod.Display))
 				{
 					mod.GetProperties(viewer, list, equipped);
 				}
@@ -131,10 +110,10 @@ namespace VitaNex.Modules.EquipmentSets
 
 		private static void EquipItem(NetState state, PacketReader reader, ref byte[] buffer, ref int length)
 		{
-			int pos = reader.Seek(0, SeekOrigin.Current);
+			var pos = reader.Seek(0, SeekOrigin.Current);
 			reader.Seek(1, SeekOrigin.Begin);
 
-			Item item = World.FindItem(reader.ReadInt32());
+			var item = World.FindItem(reader.ReadInt32());
 
 			reader.Seek(pos, SeekOrigin.Begin);
 
@@ -153,12 +132,39 @@ namespace VitaNex.Modules.EquipmentSets
 				CMOptions.ToConsole("EquipItem: {0} equiped {1}", state.Mobile, item);
 			}
 
-			Timer.DelayCall(() => Invalidate(state.Mobile, item));
+			Timer.DelayCall(Invalidate, state.Mobile);
+		}
+
+		private static void EquipItem6017(NetState state, PacketReader reader, ref byte[] buffer, ref int length)
+		{
+			var pos = reader.Seek(0, SeekOrigin.Current);
+			reader.Seek(1, SeekOrigin.Begin);
+
+			var item = World.FindItem(reader.ReadInt32());
+
+			reader.Seek(pos, SeekOrigin.Begin);
+
+			if (EquipItemParent6017 != null)
+			{
+				EquipItemParent6017(state, reader, ref buffer, ref length);
+			}
+
+			if (!CMOptions.ModuleEnabled || item == null || item.Deleted || !item.Layer.IsEquip())
+			{
+				return;
+			}
+
+			if (CMOptions.ModuleDebug)
+			{
+				CMOptions.ToConsole("EquipItem6017: {0} equiped {1}", state.Mobile, item);
+			}
+
+			Timer.DelayCall(Invalidate, state.Mobile);
 		}
 
 		private static void EquipItemRequest(NetState state, PacketReader pvSrc)
 		{
-			Item item = state.Mobile.Holding;
+			var item = state.Mobile.Holding;
 
 			if (EquipItemRequestParent != null && EquipItemRequestParent.OnReceive != null)
 			{
@@ -175,12 +181,34 @@ namespace VitaNex.Modules.EquipmentSets
 				CMOptions.ToConsole("EquipItemRequest: {0} equiping {1}", state.Mobile, item);
 			}
 
-			Timer.DelayCall(() => Invalidate(state.Mobile, item));
+			Timer.DelayCall(Invalidate, state.Mobile);
+		}
+
+		private static void EquipItemRequest6017(NetState state, PacketReader pvSrc)
+		{
+			var item = state.Mobile.Holding;
+
+			if (EquipItemRequestParent6017 != null && EquipItemRequestParent6017.OnReceive != null)
+			{
+				EquipItemRequestParent6017.OnReceive(state, pvSrc);
+			}
+
+			if (!CMOptions.ModuleEnabled || item == null || item.Deleted || !item.Layer.IsEquip())
+			{
+				return;
+			}
+
+			if (CMOptions.ModuleDebug)
+			{
+				CMOptions.ToConsole("EquipItemRequest6017: {0} equiping {1}", state.Mobile, item);
+			}
+
+			Timer.DelayCall(Invalidate, state.Mobile);
 		}
 
 		private static void DropItemRequest(NetState state, PacketReader pvSrc)
 		{
-			Item item = state.Mobile.Holding;
+			var item = state.Mobile.Holding;
 
 			if (DropItemRequestParent != null && DropItemRequestParent.OnReceive != null)
 			{
@@ -197,12 +225,12 @@ namespace VitaNex.Modules.EquipmentSets
 				CMOptions.ToConsole("DropItemRequest: {0} dropping {1}", state.Mobile, item);
 			}
 
-			Timer.DelayCall(() => Invalidate(state.Mobile, item));
+			Timer.DelayCall(Invalidate, state.Mobile);
 		}
 
 		private static void DropItemRequest6017(NetState state, PacketReader pvSrc)
 		{
-			Item item = state.Mobile.Holding;
+			var item = state.Mobile.Holding;
 
 			if (DropItemRequestParent6017 != null && DropItemRequestParent6017.OnReceive != null)
 			{
@@ -219,7 +247,13 @@ namespace VitaNex.Modules.EquipmentSets
 				CMOptions.ToConsole("DropItemRequest6017: {0} dropping {1}", state.Mobile, item);
 			}
 
-			Timer.DelayCall(() => Invalidate(state.Mobile, item));
+			Timer.DelayCall(Invalidate, state.Mobile);
+		}
+
+		public static T ResolveSet<T>()
+			where T : EquipmentSet
+		{
+			return Sets.GetValue(typeof(T)) as T;
 		}
 
 		public static List<EquipmentSet> GetSetsFor(Item item)
@@ -239,19 +273,14 @@ namespace VitaNex.Modules.EquipmentSets
 
 		public static IEnumerable<EquipmentSet> FindSetsFor(Type type)
 		{
-			return Sets.Values.Where(set => set.Valid && set.HasPartTypeOf(type));
+			return Sets.Values.Where(set => set.HasPartTypeOf(type));
 		}
 
 		public static void Invalidate(Mobile owner)
 		{
-			if (!CMOptions.ModuleEnabled || owner == null)
+			if (CMOptions.ModuleEnabled && owner != null)
 			{
-				return;
-			}
-
-			foreach (Item item in owner.FindEquippedItems<Item>())
-			{
-				Invalidate(owner, item);
+				owner.Items.ForEachReverse(item => Invalidate(owner, item));
 			}
 		}
 
@@ -264,7 +293,7 @@ namespace VitaNex.Modules.EquipmentSets
 
 			if (!CMOptions.ModuleDebug)
 			{
-				foreach (EquipmentSet set in FindSetsFor(item))
+				foreach (var set in FindSetsFor(item))
 				{
 					set.Invalidate(owner, item);
 				}
@@ -283,6 +312,151 @@ namespace VitaNex.Modules.EquipmentSets
 				}
 
 				sets.Free(true);
+			}
+		}
+
+		public static IEnumerable<EquipmentSet> FindActiveSets(Mobile owner)
+		{
+			return Sets.Values.Where(s => s.ActiveOwners.Contains(owner));
+		}
+
+		public static IEnumerable<EquipmentSetMod> FindActiveMods(Mobile owner)
+		{
+			return FindActiveSets(owner).SelectMany(s => s.Mods.Where(m => m.ActiveOwners.Contains(owner)));
+		}
+
+		public static IEnumerable<EquipmentSetPart> FindEquippedParts(Mobile owner)
+		{
+			return FindActiveSets(owner).SelectMany(s => s.Parts.Where(p => p.EquipOwners.Contains(owner)));
+		}
+
+		public static IEnumerable<T> FindActiveSets<T>(Mobile owner)
+			where T : EquipmentSet
+		{
+			return Sets.Values.OfType<T>().Where(s => s.ActiveOwners.Contains(owner));
+		}
+
+		public static IEnumerable<T> FindActiveMods<T>(Mobile owner)
+			where T : EquipmentSetMod
+		{
+			return FindActiveSets(owner).SelectMany(s => s.Mods.OfType<T>().Where(m => m.IsActive(owner)));
+		}
+
+		public static IEnumerable<T> FindEquippedParts<T>(Mobile owner)
+			where T : EquipmentSetPart
+		{
+			return FindActiveSets(owner).SelectMany(s => s.Parts.OfType<T>().Where(p => p.IsEquipped(owner)));
+		}
+
+		public static int AddSet<T>(Mobile owner)
+			where T : EquipmentSet, new()
+		{
+			return AddSet<T>(owner, null);
+		}
+
+		public static int AddSet<T>(Mobile owner, Action<Item> action)
+			where T : EquipmentSet, new()
+		{
+			var count = 0;
+
+			foreach (var o in GenerateEquip<T>(owner))
+			{
+				++count;
+
+				if (action != null)
+				{
+					action(o);
+				}
+			}
+
+			return count;
+		}
+
+		public static int AddSet(Type setType, Mobile owner)
+		{
+			return AddSet(setType, owner, null);
+		}
+
+		public static int AddSet(Type setType, Mobile owner, Action<Item> action)
+		{
+			var count = 0;
+
+			foreach (var o in GenerateEquip(setType, owner))
+			{
+				++count;
+
+				if (action != null)
+				{
+					action(o);
+				}
+			}
+
+			return count;
+		}
+
+		public static Item GenerateRandomPart<T>()
+			where T : EquipmentSet, new()
+		{
+			return GenerateRandomPart(typeof(T));
+		}
+
+		public static Item GenerateRandomPart(Type setType)
+		{
+			var set = Sets.GetValue(setType);
+
+			return set == null ? null : set.GenerateRandomPart();
+		}
+
+		public static IEnumerable<Item> GenerateParts<T>()
+			where T : EquipmentSet, new()
+		{
+			return GenerateParts(typeof(T));
+		}
+
+		public static IEnumerable<Item> GenerateParts(Type setType)
+		{
+			var set = Sets.GetValue(setType);
+
+			if (set == null)
+			{
+				yield break;
+			}
+
+			var parts = set.GenerateParts();
+
+			if (parts == null)
+			{
+				yield break;
+			}
+
+			foreach (var p in parts)
+			{
+				yield return p;
+			}
+		}
+
+		public static IEnumerable<Item> GenerateEquip<T>(Mobile owner)
+			where T : EquipmentSet, new()
+		{
+			return GenerateEquip(typeof(T), owner);
+		}
+
+		public static IEnumerable<Item> GenerateEquip(Type setType, Mobile owner)
+		{
+			foreach (var p in GenerateParts(setType))
+			{
+				if (!owner.EquipItem(p) && (!owner.Player || !owner.PlaceInBackpack(p)))
+				{
+					p.Delete();
+					continue;
+				}
+
+				if (!owner.Player)
+				{
+					p.Movable = false;
+				}
+
+				yield return p;
 			}
 		}
 	}

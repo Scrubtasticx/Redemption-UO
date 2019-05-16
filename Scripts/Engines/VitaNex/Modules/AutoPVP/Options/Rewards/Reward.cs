@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -34,53 +34,88 @@ namespace VitaNex.Modules.AutoPvP
 		Item
 	}
 
-	public class PvPReward : ItemTypeSelectProperty
+	public class PvPReward : PropertyObject
 	{
-		private int _Amount;
-		private PvPRewardClass _Class;
+		private class InternalTypeSelect : ItemTypeSelectProperty
+		{
+			private readonly PvPReward _Owner;
+
+			[CommandProperty(AutoPvP.Access)]
+			public override string TypeName
+			{
+				get { return base.TypeName; }
+				set
+				{
+					base.TypeName = value;
+
+					if (_Owner == null)
+					{
+						return;
+					}
+
+					if (InternalType != null)
+					{
+						if (InternalType.IsConstructableFrom<Item>())
+						{
+							_Owner.Class = PvPRewardClass.Item;
+							_Owner.DeliveryMethod = PvPRewardDeliveryMethod.Backpack;
+						}
+						else
+						{
+							_Owner.Class = PvPRewardClass.Custom;
+							_Owner.DeliveryMethod = PvPRewardDeliveryMethod.Custom;
+						}
+					}
+					else
+					{
+						_Owner.Class = PvPRewardClass.None;
+						_Owner.DeliveryMethod = PvPRewardDeliveryMethod.None;
+					}
+				}
+			}
+
+			public InternalTypeSelect(PvPReward owner, GenericReader reader)
+				: base(reader)
+			{
+				_Owner = owner;
+			}
+
+			public InternalTypeSelect(PvPReward owner, string type)
+				: base(type)
+			{
+				_Owner = owner;
+			}
+
+			public override void Serialize(GenericWriter writer)
+			{
+				base.Serialize(writer);
+
+				writer.SetVersion(0);
+			}
+
+			public override void Deserialize(GenericReader reader)
+			{
+				base.Deserialize(reader);
+
+				reader.GetVersion();
+			}
+		}
+
+		private InternalTypeSelect _InternalTypeSelect;
+
 		private PvPRewardDeliveryMethod _DeliveryMethod = PvPRewardDeliveryMethod.Backpack;
-
-		public PvPReward(string type = "")
-			: base(type)
-		{ }
-
-		public PvPReward(GenericReader reader)
-			: base(reader)
-		{ }
 
 		[CommandProperty(AutoPvP.Access)]
 		public virtual bool Enabled { get; set; }
 
 		[CommandProperty(AutoPvP.Access)]
-		public virtual int Amount { get { return _Amount; } set { _Amount = Math.Max(1, Math.Min(60000, value)); } }
+		public virtual int Amount { get; set; }
 
 		[CommandProperty(AutoPvP.Access)]
-		public override string TypeName
+		public virtual string TypeName
 		{
-			get { return base.TypeName; }
-			set
-			{
-				base.TypeName = value;
-
-				if (InternalType != null)
-				{
-					if (InternalType.IsConstructableFrom(typeof(Item), new Type[0]))
-					{
-						_Class = PvPRewardClass.Item;
-						DeliveryMethod = PvPRewardDeliveryMethod.Backpack;
-					}
-					else
-					{
-						_Class = PvPRewardClass.Custom;
-						DeliveryMethod = PvPRewardDeliveryMethod.Custom;
-					}
-				}
-				else
-				{
-					_Class = PvPRewardClass.None;
-					DeliveryMethod = PvPRewardDeliveryMethod.None;
-				}
-			}
+			get { return _InternalTypeSelect.TypeName; }
+			set { _InternalTypeSelect.TypeName = value; }
 		}
 
 		[CommandProperty(AutoPvP.Access)]
@@ -89,7 +124,7 @@ namespace VitaNex.Modules.AutoPvP
 			get { return _DeliveryMethod; }
 			set
 			{
-				if (Class == PvPRewardClass.Custom)
+				if (value != PvPRewardDeliveryMethod.None && Class == PvPRewardClass.Custom)
 				{
 					value = PvPRewardDeliveryMethod.Custom;
 				}
@@ -98,119 +133,118 @@ namespace VitaNex.Modules.AutoPvP
 			}
 		}
 
-		[CommandProperty(AutoPvP.Access)]
-		public PvPRewardClass Class { get { return _Class; } }
+		[CommandProperty(AutoPvP.Access, true)]
+		public PvPRewardClass Class { get; private set; }
 
-		public override void Clear()
+		public PvPReward()
+			: this(String.Empty)
+		{ }
+
+		public PvPReward(string type)
 		{
-			base.Clear();
+			_InternalTypeSelect = new InternalTypeSelect(this, type);
 
 			Enabled = false;
 			Amount = 1;
-			_Class = PvPRewardClass.None;
-			DeliveryMethod = PvPRewardDeliveryMethod.None;
+			Class = PvPRewardClass.None;
+			_DeliveryMethod = PvPRewardDeliveryMethod.None;
+		}
+
+		public PvPReward(GenericReader reader)
+			: base(reader)
+		{ }
+
+		public override void Clear()
+		{
+			_InternalTypeSelect.Clear();
+
+			Enabled = false;
+			Amount = 1;
+			Class = PvPRewardClass.None;
+			_DeliveryMethod = PvPRewardDeliveryMethod.None;
 		}
 
 		public override void Reset()
 		{
-			base.Reset();
+			_InternalTypeSelect.Reset();
 
 			Enabled = false;
 			Amount = 1;
-			_Class = PvPRewardClass.None;
-			DeliveryMethod = PvPRewardDeliveryMethod.Backpack;
+			Class = PvPRewardClass.None;
+			_DeliveryMethod = PvPRewardDeliveryMethod.Backpack;
 		}
 
-		public virtual Item[] GiveReward(PlayerMobile pm)
+		public virtual List<Item> GiveReward(PlayerMobile pm)
 		{
+			var items = new List<Item>();
+
 			if (pm == null || pm.Deleted || !Enabled)
 			{
-				return new Item[0];
+				return items;
 			}
 
-			Item e = CreateInstance();
+			var amount = Amount;
 
-			if (e == null)
+			while (amount > 0)
 			{
-				return new Item[0];
-			}
+				var reward = _InternalTypeSelect.CreateInstance();
 
-			var items = new List<Item>
-			{
-				e
-			};
-
-			if (e.Stackable)
-			{
-				e.Amount = Amount;
-			}
-			else
-			{
-				int count = Amount - 1;
-
-				while (--count >= 0)
+				if (reward == null)
 				{
-					items.Add(CreateInstance());
+					return items;
 				}
+
+				items.Add(reward);
+
+				if (reward.Stackable)
+				{
+					reward.Amount = Math.Min(60000, amount);
+				}
+
+				amount -= reward.Amount;
 			}
 
-			items.ToArray().ForEach(
+			items.ForEach(
 				item =>
 				{
 					switch (_DeliveryMethod)
 					{
+						case PvPRewardDeliveryMethod.Custom:
+							break;
 						case PvPRewardDeliveryMethod.Bank:
-							{
-								if (pm.BankBox == null || pm.BankBox.Deleted || !pm.BankBox.TryDropItem(pm, item, true))
-								{
-									if (!pm.AddToBackpack(item))
-									{
-										item.Delete();
-										items.Remove(item);
-									}
-								}
-							}
+							item.GiveTo(pm, GiveFlags.Bank | GiveFlags.Delete);
+							break;
+						case PvPRewardDeliveryMethod.Backpack:
+							item.GiveTo(pm, GiveFlags.Pack | GiveFlags.Delete);
 							break;
 						default:
-							{
-								if (!pm.AddToBackpack(item))
-								{
-									if (pm.BankBox == null || pm.BankBox.Deleted || !pm.BankBox.TryDropItem(pm, item, true))
-									{
-										item.Delete();
-										items.Remove(item);
-									}
-								}
-							}
+							item.GiveTo(pm, GiveFlags.PackBankDelete);
 							break;
 					}
 				});
 
-			return items.ToArray();
-		}
+			items.RemoveAll(i => i == null || i.Deleted);
 
-		public override string ToString()
-		{
-			return "Battle Reward";
+			return items;
 		}
 
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(1);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
-				case 1:
-					writer.Write(Amount);
-					goto case 0;
 				case 0:
-					{
-						writer.Write(Enabled);
-						writer.WriteFlag(_Class);
-						writer.WriteFlag(DeliveryMethod);
-					}
+				{
+					_InternalTypeSelect.Serialize(writer);
+
+					writer.Write(Amount);
+					writer.Write(Enabled);
+					writer.WriteFlag(Class);
+					writer.WriteFlag(_DeliveryMethod);
+				}
 					break;
 			}
 		}
@@ -219,25 +253,30 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			base.Deserialize(reader);
 
-			int version = reader.ReadInt();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
-				case 1:
-					Amount = reader.ReadInt();
-					goto case 0;
 				case 0:
-					{
-						Enabled = reader.ReadBool();
-						_Class = reader.ReadFlag<PvPRewardClass>();
-						DeliveryMethod = reader.ReadFlag<PvPRewardDeliveryMethod>();
+				{
+					_InternalTypeSelect = new InternalTypeSelect(this, reader);
 
-						if (version < 1)
-						{
-							Amount = 1;
-						}
-					}
+					Amount = reader.ReadInt();
+					Enabled = reader.ReadBool();
+					Class = reader.ReadFlag<PvPRewardClass>();
+					_DeliveryMethod = reader.ReadFlag<PvPRewardDeliveryMethod>();
+				}
 					break;
+			}
+
+			if (_InternalTypeSelect == null)
+			{
+				_InternalTypeSelect = new InternalTypeSelect(this, String.Empty);
+			}
+
+			if (Amount < 1)
+			{
+				Amount = 1;
 			}
 		}
 	}

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -45,7 +45,7 @@ namespace VitaNex.Modules.Toolbar
 
 		private static void ClearDefaults()
 		{
-			DefaultEntries = new ToolbarState(null, CMOptions.DefaultWidth, CMOptions.DefaultHeight);
+			DefaultEntries = ToolbarState.NewEmpty;
 		}
 
 		private static void LoadDefaults()
@@ -73,8 +73,8 @@ namespace VitaNex.Modules.Toolbar
 
 		public static void OpenAll()
 		{
-			foreach (var p in
-				Profiles.Where(p => p.Key != null && p.Value != null && p.Key.IsOnline() && p.Key.AccessLevel >= CMOptions.Access))
+			foreach (var p in Profiles.Where(
+				p => p.Key != null && p.Value != null && p.Key.IsOnline() && p.Key.AccessLevel >= CMOptions.Access))
 			{
 				VitaNexCore.TryCatch(() => p.Value.GetToolbarGump().Send(), CMOptions.ToConsole);
 			}
@@ -90,7 +90,7 @@ namespace VitaNex.Modules.Toolbar
 
 		private static void OnLogin(LoginEventArgs e)
 		{
-			PlayerMobile user = e.Mobile as PlayerMobile;
+			var user = e.Mobile as PlayerMobile;
 
 			if (user != null && !user.Deleted && user.NetState != null && user.AccessLevel >= CMOptions.Access &&
 				CMOptions.LoginPopup)
@@ -101,7 +101,7 @@ namespace VitaNex.Modules.Toolbar
 
 		public static Point GetOffset(PlayerMobile user)
 		{
-			Point loc = new Point(0, 28);
+			var loc = new Point(0, 28);
 
 			if (user == null || user.Deleted)
 			{
@@ -127,6 +127,26 @@ namespace VitaNex.Modules.Toolbar
 			Profiles[user].Y = loc.Y;
 		}
 
+		public static void SetGlobalPosition()
+		{
+			VitaNexCore.TryCatch(
+				() => Profiles.Values.ForEach(
+					state => VitaNexCore.TryCatch(
+						() =>
+						{
+							state.SetDefaultPosition();
+
+							var tb = state.GetToolbarGump();
+
+							if (tb != null && tb.IsOpen)
+							{
+								tb.Refresh(true);
+							}
+						},
+						CMOptions.ToConsole)),
+				CMOptions.ToConsole);
+		}
+
 		public static void SetGlobalSize()
 		{
 			VitaNexCore.TryCatch(
@@ -136,7 +156,27 @@ namespace VitaNex.Modules.Toolbar
 						{
 							state.SetDefaultSize();
 
-							SuperGump tb = state.GetToolbarGump();
+							var tb = state.GetToolbarGump();
+
+							if (tb != null && tb.IsOpen)
+							{
+								tb.Refresh(true);
+							}
+						},
+						CMOptions.ToConsole)),
+				CMOptions.ToConsole);
+		}
+
+		public static void SetGlobalTheme()
+		{
+			VitaNexCore.TryCatch(
+				() => Profiles.Values.ForEach(
+					state => VitaNexCore.TryCatch(
+						() =>
+						{
+							state.SetDefaultTheme();
+
+							var tb = state.GetToolbarGump();
 
 							if (tb != null && tb.IsOpen)
 							{
@@ -156,7 +196,27 @@ namespace VitaNex.Modules.Toolbar
 						{
 							state.SetDefaultEntries();
 
-							SuperGump tb = state.GetToolbarGump();
+							var tb = state.GetToolbarGump();
+
+							if (tb != null && tb.IsOpen)
+							{
+								tb.Refresh(true);
+							}
+						},
+						CMOptions.ToConsole)),
+				CMOptions.ToConsole);
+		}
+
+		public static void SetGlobalDefaults()
+		{
+			VitaNexCore.TryCatch(
+				() => Profiles.Values.ForEach(
+					state => VitaNexCore.TryCatch(
+						() =>
+						{
+							state.SetDefaults();
+
+							var tb = state.GetToolbarGump();
 
 							if (tb != null && tb.IsOpen)
 							{
@@ -169,22 +229,19 @@ namespace VitaNex.Modules.Toolbar
 
 		public static ToolbarState EnsureState(PlayerMobile user)
 		{
-			if (Profiles.ContainsKey(user))
+			if (user == null)
 			{
-				if (Profiles[user] == null)
-				{
-					Profiles[user] = new ToolbarState(user);
-					Profiles[user].SetDefaultEntries();
-				}
-			}
-			else
-			{
-				ToolbarState state = new ToolbarState(user);
-				state.SetDefaultEntries();
-				Profiles.Add(user, state);
+				return null;
 			}
 
-			return Profiles[user];
+			ToolbarState state;
+
+			if (!Profiles.TryGetValue(user, out state) || state == null)
+			{
+				Profiles[user] = state = new ToolbarState(user);
+			}
+
+			return state;
 		}
 	}
 }

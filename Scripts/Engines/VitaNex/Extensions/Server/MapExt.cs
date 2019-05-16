@@ -3,13 +3,14 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -24,6 +25,7 @@ namespace Server
 		public static List<int> StaticWaterTiles = new List<int>
 		{
 			5465,
+			6038,
 			6039,
 			6040,
 			6041,
@@ -187,6 +189,43 @@ namespace Server
 		};
 		#endregion
 
+		#region LandCoastlineTiles
+		public static List<int> LandCoastlineTiles = new List<int>
+		{
+			26,
+			27,
+			28,
+			29,
+			30,
+			31,
+			32,
+			33,
+			34,
+			35,
+			36,
+			37,
+			38,
+			39,
+			40,
+			41,
+			42,
+			43,
+			44,
+			45,
+			46,
+			47,
+			48,
+			49,
+			50
+		};
+		#endregion
+
+		public static bool IsWater(this Item item)
+		{
+			return StaticWaterTiles.Contains(item.ItemID) || item.ItemData.Flags.HasFlag(TileFlag.Wet) ||
+				   Insensitive.Contains(item.Name, "water");
+		}
+
 		public static bool IsWater(this LandTarget targ)
 		{
 			return LandWaterTiles.Contains(targ.TileID) || TileData.LandTable[targ.TileID].Flags.HasFlag(TileFlag.Wet) ||
@@ -211,6 +250,12 @@ namespace Server
 				   Insensitive.Contains(TileData.ItemTable[tile.ID].Name, "water");
 		}
 
+		public static bool IsCoastline(this LandTile tile)
+		{
+			return LandCoastlineTiles.Contains(tile.ID) || (TileData.LandTable[tile.ID].Flags == TileFlag.Impassable &&
+															Insensitive.Contains(TileData.LandTable[tile.ID].Name, "sand"));
+		}
+
 		public static bool HasWater(this Map map, IPoint2D p)
 		{
 			return IsWater(GetLandTile(map, p)) || GetStaticTiles(map, p).Any(IsWater);
@@ -218,7 +263,7 @@ namespace Server
 
 		public static bool HasLand(this Map map, IPoint2D p)
 		{
-			return !(GetLandTile(map, p).Ignored);
+			return !GetLandTile(map, p).Ignored;
 		}
 
 		public static LandTile GetLandTile(this Map map, IPoint2D p)
@@ -234,6 +279,44 @@ namespace Server
 		public static StaticTile[] GetStaticTiles(this Map map, IPoint2D p, bool multis)
 		{
 			return map.Tiles.GetStaticTiles(p.X, p.Y, multis);
+		}
+
+		public static Rectangle2D GetInnerBounds2D(this Map map)
+		{
+			switch (map.MapID)
+			{
+				case 0:
+				case 1:
+					return new Rectangle2D(0, 0, Math.Min(5120, map.Width), map.Height);
+				case 3:
+					return new Rectangle2D(512, 0, map.Width - 512, map.Height);
+			}
+
+			return new Rectangle2D(0, 0, map.Width, map.Height);
+		}
+
+		public static Rectangle3D GetInnerBounds3D(this Map map)
+		{
+			switch (map.MapID)
+			{
+				case 0:
+				case 1:
+					return new Rectangle3D(0, 0, Region.MinZ, Math.Min(5120, map.Width), map.Height, Region.MaxZ - Region.MinZ);
+				case 3:
+					return new Rectangle3D(512, 0, Region.MinZ, map.Width - 512, map.Height, Region.MaxZ - Region.MinZ);
+			}
+
+			return new Rectangle3D(0, 0, Region.MinZ, map.Width, map.Height, Region.MaxZ - Region.MinZ);
+		}
+
+		public static Rectangle2D GetBounds2D(this Map map)
+		{
+			return new Rectangle2D(0, 0, map.Width, map.Height);
+		}
+
+		public static Rectangle3D GetBounds3D(this Map map)
+		{
+			return new Rectangle3D(0, 0, Region.MinZ, map.Width, map.Height, Region.MaxZ - Region.MinZ);
 		}
 	}
 }

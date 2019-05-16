@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -13,6 +13,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 using Server;
 using Server.Mobiles;
@@ -109,113 +110,113 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void Serialize(GenericWriter writer)
 		{
-			int version = writer.SetVersion(1);
+			var version = writer.SetVersion(1);
 
 			switch (version)
 			{
 				case 1:
-					{
-						writer.WriteBlockDictionary(
-							Winners,
-							(w, k, v) =>
-							{
-								w.Write(k);
-								w.WriteItemList(v, true);
-							});
+				{
+					writer.WriteBlockDictionary(
+						Winners,
+						(w, k, v) =>
+						{
+							w.Write(k);
+							w.WriteItemList(v, true);
+						});
 
-						writer.WriteBlockDictionary(
-							Losers,
-							(w, k, v) =>
-							{
-								w.Write(k);
-								w.WriteItemList(v, true);
-							});
-					}
+					writer.WriteBlockDictionary(
+						Losers,
+						(w, k, v) =>
+						{
+							w.Write(k);
+							w.WriteItemList(v, true);
+						});
+				}
 					goto case 0;
 				case 0:
+				{
+					writer.Write(Number);
+
+					if (version < 1)
 					{
-						writer.Write(Number);
-
-						if (version < 1)
-						{
-							writer.WriteMobileList(Winners.Keys.ToList(), true);
-							writer.WriteMobileList(Losers.Keys.ToList(), true);
-						}
-
-						if (Started != null)
-						{
-							writer.Write(true);
-							writer.Write(Started.Value);
-						}
-						else
-						{
-							writer.Write(false);
-						}
-
-						if (Ended != null)
-						{
-							writer.Write(true);
-							writer.Write(Ended.Value);
-						}
-						else
-						{
-							writer.Write(false);
-						}
+						writer.WriteMobileList(Winners.Keys.ToList(), true);
+						writer.WriteMobileList(Losers.Keys.ToList(), true);
 					}
+
+					if (Started != null)
+					{
+						writer.Write(true);
+						writer.Write(Started.Value);
+					}
+					else
+					{
+						writer.Write(false);
+					}
+
+					if (Ended != null)
+					{
+						writer.Write(true);
+						writer.Write(Ended.Value);
+					}
+					else
+					{
+						writer.Write(false);
+					}
+				}
 					break;
 			}
 		}
 
 		public virtual void Deserialize(GenericReader reader)
 		{
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
 				case 1:
-					{
-						Winners = reader.ReadBlockDictionary(
-							r =>
-							{
-								var k = r.ReadMobile<PlayerMobile>();
-								var v = r.ReadStrongItemList();
-								return new KeyValuePair<PlayerMobile, List<Item>>(k, v);
-							});
+				{
+					Winners = reader.ReadBlockDictionary(
+						r =>
+						{
+							var k = r.ReadMobile<PlayerMobile>();
+							var v = r.ReadStrongItemList();
+							return new KeyValuePair<PlayerMobile, List<Item>>(k, v);
+						});
 
-						Losers = reader.ReadBlockDictionary(
-							r =>
-							{
-								var k = r.ReadMobile<PlayerMobile>();
-								var v = r.ReadStrongItemList();
-								return new KeyValuePair<PlayerMobile, List<Item>>(k, v);
-							});
-					}
+					Losers = reader.ReadBlockDictionary(
+						r =>
+						{
+							var k = r.ReadMobile<PlayerMobile>();
+							var v = r.ReadStrongItemList();
+							return new KeyValuePair<PlayerMobile, List<Item>>(k, v);
+						});
+				}
 					goto case 0;
 				case 0:
+				{
+					Number = reader.ReadInt();
+
+					if (version < 1)
 					{
-						Number = reader.ReadInt();
+						var winners = reader.ReadStrongMobileList<PlayerMobile>();
+						Winners = new Dictionary<PlayerMobile, List<Item>>(winners.Count);
+						winners.ForEach(m => Winners.Add(m, new List<Item>()));
 
-						if (version < 1)
-						{
-							var winners = reader.ReadStrongMobileList<PlayerMobile>();
-							Winners = new Dictionary<PlayerMobile, List<Item>>(winners.Count);
-							winners.ForEach(m => Winners.Add(m, new List<Item>()));
-
-							var losers = reader.ReadStrongMobileList<PlayerMobile>();
-							Losers = new Dictionary<PlayerMobile, List<Item>>(losers.Count);
-							losers.ForEach(m => Losers.Add(m, new List<Item>()));
-						}
-
-						if (reader.ReadBool())
-						{
-							Started = reader.ReadDateTime();
-						}
-
-						if (reader.ReadBool())
-						{
-							Ended = reader.ReadDateTime();
-						}
+						var losers = reader.ReadStrongMobileList<PlayerMobile>();
+						Losers = new Dictionary<PlayerMobile, List<Item>>(losers.Count);
+						losers.ForEach(m => Losers.Add(m, new List<Item>()));
 					}
+
+					if (reader.ReadBool())
+					{
+						Started = reader.ReadDateTime();
+					}
+
+					if (reader.ReadBool())
+					{
+						Ended = reader.ReadDateTime();
+					}
+				}
 					break;
 			}
 		}
@@ -227,7 +228,33 @@ namespace VitaNex.Modules.AutoPvP
 
 		public string ToHtmlString(Mobile viewer = null, bool big = true)
 		{
-			return big ? String.Format("<big>{0}</big>", ToString()) : ToString();
+			var sb = new StringBuilder();
+
+			sb.AppendLine(ToString());
+			sb.AppendLine();
+
+			if (Started != null)
+			{
+				sb.AppendLine("Started: {0}", Started);
+			}
+
+			if (Ended != null)
+			{
+				sb.AppendLine("Ended: {0}", Ended);
+			}
+
+			if (Winners.Count > 0)
+			{
+				sb.AppendLine("Winners");
+				sb.AppendLine();
+
+				Winners.Keys.For(
+					(i, p) => sb.AppendLine("{0}: {1}", (Numeral)(i + 1), p.Name.WrapUOHtmlColor(viewer.GetNotorietyColor(p))));
+			}
+
+			sb.AppendLine();
+
+			return big ? String.Format("<big>{0}</big>", sb) : sb.ToString();
 		}
 	}
 }

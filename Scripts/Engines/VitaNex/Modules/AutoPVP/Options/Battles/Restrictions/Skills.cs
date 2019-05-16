@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -24,6 +24,12 @@ namespace VitaNex.Modules.AutoPvP
 	{
 		private static readonly string[] _SkillNames = Enum.GetNames(typeof(SkillName));
 
+		private static int FindSkill(string name, bool ignoreCase = true)
+		{
+			return _SkillNames.IndexOf(
+				_SkillNames.FirstOrDefault(s => ignoreCase ? Insensitive.Equals(s, name) : String.Equals(s, name)));
+		}
+
 		public PvPBattleSkillRestrictions()
 		{ }
 
@@ -31,16 +37,14 @@ namespace VitaNex.Modules.AutoPvP
 			: base(reader)
 		{ }
 
-		private static int FindSkill(string name, bool ignoreCase = true)
+		public override string ToString()
 		{
-			return
-				_SkillNames.IndexOf(
-					_SkillNames.FirstOrDefault(s => ignoreCase ? Insensitive.Equals(s, name) : String.Equals(s, name)));
+			return "Skill Restrictions";
 		}
 
 		public override void Invalidate()
 		{
-			foreach (SkillInfo info in SkillInfo.Table)
+			foreach (var info in SkillInfo.Table)
 			{
 				SetRestricted(info, false);
 			}
@@ -108,11 +112,6 @@ namespace VitaNex.Modules.AutoPvP
 			return key >= 0 && base.IsRestricted(key);
 		}
 
-		public override string ToString()
-		{
-			return "Skill Restrictions";
-		}
-
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
@@ -135,8 +134,8 @@ namespace VitaNex.Modules.AutoPvP
 
 		public override KeyValuePair<int, bool> DeserializeEntry(GenericReader reader)
 		{
-			int k = reader.ReadInt();
-			bool v = reader.ReadBool();
+			var k = reader.ReadInt();
+			var v = reader.ReadBool();
 			return new KeyValuePair<int, bool>(k, v);
 		}
 	}

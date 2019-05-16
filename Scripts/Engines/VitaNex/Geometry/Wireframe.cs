@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -14,11 +14,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+
+using VitaNex.Collections;
 #endregion
 
 namespace Server
 {
-	public interface IWireframe
+	public interface IWireframe : IEnumerable<Block3D>
 	{
 		bool Intersects(IBlock3D b);
 		bool Intersects(int x, int y, int z);
@@ -28,34 +30,41 @@ namespace Server
 		IEnumerable<Block3D> Offset(int x = 0, int y = 0, int z = 0, int h = 0);
 	}
 
-	public struct Wireframe : IEnumerable<Block3D>, IEquatable<Wireframe>, IWireframe
+	public sealed class Wireframe : IEquatable<Wireframe>, IWireframe
 	{
-		public static readonly Wireframe Empty = new Wireframe();
+		public static readonly Wireframe Empty = new Wireframe(0);
 
 		public Block3D[] Blocks { get; private set; }
 
-		public int Volume { get { return Blocks != null ? Blocks.Length : 0; } }
+		public int Volume { get { return Blocks.Length; } }
 
-		public Wireframe(int length)
-			: this(new Block3D[length])
+		public int Length { get { return Blocks.Length; } }
+
+		public Wireframe(params IBlock3D[] blocks)
+			: this(blocks.Ensure().Select(b => new Block3D(b)))
 		{ }
 
 		public Wireframe(IEnumerable<IBlock3D> blocks)
-			: this(blocks.ToArray())
+			: this(blocks.Ensure().Select(b => new Block3D(b)))
 		{ }
 
-		public Wireframe(params IBlock3D[] blocks)
-			: this(blocks.Select(b => new Block3D(b)).ToArray())
+		public Wireframe(Wireframe frame)
+			: this(frame.Blocks)
 		{ }
 
-		public Wireframe(IEnumerable<Block3D> blocks)
-			: this(blocks.ToArray())
-		{ }
+		public Wireframe(int capacity)
+		{
+			Blocks = new Block3D[capacity];
+		}
 
 		public Wireframe(params Block3D[] blocks)
-			: this()
 		{
-			Blocks = blocks;
+			Blocks = blocks.Ensure().ToArray();
+		}
+
+		public Wireframe(IEnumerable<Block3D> blocks)
+		{
+			Blocks = blocks.Ensure().ToArray();
 		}
 
 		public bool Intersects(IPoint3D p)
@@ -80,27 +89,35 @@ namespace Server
 
 		public bool Intersects(int x, int y, int z, int h)
 		{
-			return Blocks.AsParallel().Any(b => b.Intersects(x, y, z, h));
+			return Blocks.Any(b => b.Intersects(x, y, z, h));
 		}
 
 		public bool Intersects(IWireframe frame)
 		{
-			return frame != null && Blocks.AsParallel().Any(b => frame.Intersects(b));
+			return frame != null && Blocks.Any(b => frame.Intersects(b));
 		}
 
 		public Rectangle3D GetBounds()
 		{
-			return
-				new Rectangle3D(
-					new Point3D(
-						Blocks.AsParallel().Min(o => o.X), Blocks.AsParallel().Min(o => o.Y), Blocks.AsParallel().Min(o => o.Z)),
-					new Point3D(
-						Blocks.AsParallel().Max(o => o.X), Blocks.AsParallel().Max(o => o.Y), Blocks.AsParallel().Max(o => o.Z + o.H)));
+			Point3D min = Point3D.Zero, max = Point3D.Zero;
+
+			foreach (var b in Blocks)
+			{
+				min.X = Math.Min(min.X, b.X);
+				min.Y = Math.Min(min.Y, b.Y);
+				min.Z = Math.Min(min.Z, b.Z);
+
+				max.X = Math.Max(max.X, b.X);
+				max.Y = Math.Max(max.Y, b.Y);
+				max.Z = Math.Max(max.Z, b.Z + b.H);
+			}
+
+			return new Rectangle3D(min, max);
 		}
 
 		public IEnumerable<Block3D> Offset(int x = 0, int y = 0, int z = 0, int h = 0)
 		{
-			return this.AsParallel().Select(b => new Block3D(b.X + x, b.Y + y, b.Z + z, b.H + h));
+			return Blocks.Select(b => b.Offset(x, y, z, h));
 		}
 
 		public IEnumerator<Block3D> GetEnumerator()
@@ -113,53 +130,79 @@ namespace Server
 			return GetEnumerator();
 		}
 
+		public Block3D this[int index]
+		{
+			get
+			{
+				if (index < 0 || index >= Blocks.Length)
+				{
+					return Block3D.Empty;
+				}
+
+				return Blocks[index];
+			}
+			set
+			{
+				if (index >= 0 && index < Blocks.Length)
+				{
+					Blocks[index] = value;
+
+					_Hash = null;
+				}
+			}
+		}
+
+		private int? _Hash;
+
+		public int HashCode { get { return _Hash ?? (_Hash = Blocks.GetContentsHashCode(true)).Value; } }
+
+		public override int GetHashCode()
+		{
+			return HashCode;
+		}
+
 		public override bool Equals(object obj)
 		{
-			return obj is Wireframe ? Equals((Wireframe)obj) : base.Equals(obj);
+			return obj is Wireframe && Equals((Wireframe)obj);
 		}
 
 		public bool Equals(Wireframe other)
 		{
-			return GetHashCode() == other.GetHashCode();
-		}
-
-		public override int GetHashCode()
-		{
-			return Blocks.Aggregate(Blocks.Length, (hash, d) => unchecked((hash * 397) ^ d.GetHashCode()));
+			return !ReferenceEquals(other, null) && (ReferenceEquals(this, other) || GetHashCode() == other.GetHashCode());
 		}
 
 		public override string ToString()
 		{
-			return String.Format("Wireframe ({0:#,0} blocks)", Blocks.Length);
+			return String.Format("Wireframe ({0:#,0} blocks)", Length);
 		}
 
 		public static bool operator ==(Wireframe l, Wireframe r)
 		{
-			return l.Equals(r);
+			return ReferenceEquals(l, null) ? ReferenceEquals(r, null) : l.Equals(r);
 		}
 
 		public static bool operator !=(Wireframe l, Wireframe r)
 		{
-			return !l.Equals(r);
+			return ReferenceEquals(l, null) ? !ReferenceEquals(r, null) : !l.Equals(r);
 		}
 	}
 
 	public class DynamicWireframe : IEquatable<DynamicWireframe>, IWireframe
 	{
-		public static readonly DynamicWireframe Empty = new DynamicWireframe(0);
-
 		public bool Rendering { get; protected set; }
 
 		public virtual List<Block3D> Blocks { get; set; }
 
-		public virtual int Volume { get { return Blocks != null ? Blocks.Count : 0; } }
+		public virtual int Volume { get { return Blocks.Count; } }
+
+		public int Count { get { return Blocks.Count; } }
 
 		public DynamicWireframe(params IBlock3D[] blocks)
-			: this(blocks.Select(b => new Block3D(b)))
+			: this(blocks.Ensure().Select(b => new Block3D(b)))
 		{ }
 
 		public DynamicWireframe(IEnumerable<IBlock3D> blocks)
-			: this(blocks.Select(b => new Block3D(b)))
+			: this(blocks.Ensure().Select(b => new Block3D(b)))
 		{ }
 
 		public DynamicWireframe(Wireframe frame)
@@ -167,7 +210,7 @@ namespace Server
 		{ }
 
 		public DynamicWireframe()
-			: this(0)
+			: this(0x100)
 		{ }
 
 		public DynamicWireframe(int capacity)
@@ -177,12 +220,12 @@ namespace Server
 
 		public DynamicWireframe(params Block3D[] blocks)
 		{
-			Blocks = blocks.ToList();
+			Blocks = blocks.Ensure().ToList();
 		}
 
 		public DynamicWireframe(IEnumerable<Block3D> blocks)
 		{
-			Blocks = blocks.ToList();
+			Blocks = blocks.Ensure().ToList();
 		}
 
 		public DynamicWireframe(GenericReader reader)
@@ -190,6 +233,19 @@ namespace Server
 			Rendering = true;
 			Deserialize(reader);
 			Rendering = false;
+		}
+
+		public void Flatten()
+		{
+			var list = ListPool<Block3D>.AcquireObject();
+
+			list.AddRange(this);
+
+			Clear();
+
+			AddRange(list.Flatten());
+
+			ObjectPool.Free(ref list);
 		}
 
 		public bool Intersects(IPoint3D p)
@@ -209,62 +265,42 @@ namespace Server
 
 		public bool Intersects(int x, int y, int z, int h)
 		{
-			return Blocks.AsParallel().Any(b => b.Intersects(x, y, z, h));
+			return Blocks.Any(b => b.Intersects(x, y, z, h));
 		}
 
 		public bool Intersects(IWireframe frame)
 		{
-			return frame != null && Blocks.AsParallel().Any(b => frame.Intersects(b));
+			return frame != null && Blocks.Any(b => frame.Intersects(b));
 		}
 
 		public Rectangle3D GetBounds()
 		{
-			return
-				new Rectangle3D(
-					new Point3D(
-						Blocks.AsParallel().Min(o => o.X), Blocks.AsParallel().Min(o => o.Y), Blocks.AsParallel().Min(o => o.Z)),
-					new Point3D(
-						Blocks.AsParallel().Max(o => o.X), Blocks.AsParallel().Max(o => o.Y), Blocks.AsParallel().Max(o => o.Z + o.H)));
+			Point3D min = Point3D.Zero, max = Point3D.Zero;
+
+			foreach (var b in Blocks)
+			{
+				min.X = Math.Min(min.X, b.X);
+				min.Y = Math.Min(min.Y, b.Y);
+				min.Z = Math.Min(min.Z, b.Z);
+
+				max.X = Math.Max(max.X, b.X);
+				max.Y = Math.Max(max.Y, b.Y);
+				max.Z = Math.Max(max.Z, b.Z + b.H);
+			}
+
+			return new Rectangle3D(min, max);
 		}
 
 		public IEnumerable<Block3D> Offset(int x = 0, int y = 0, int z = 0, int h = 0)
 		{
-			return Blocks.AsParallel().Select(b => new Block3D(b.X + x, b.Y + y, b.Z + z, b.H + h));
-		}
-
-		public override bool Equals(object obj)
-		{
-			return obj is DynamicWireframe ? Equals((DynamicWireframe)obj) : base.Equals(obj);
-		}
-
-		public bool Equals(DynamicWireframe other)
-		{
-			if (ReferenceEquals(other, null))
-			{
-				return false;
-			}
-
-			if (ReferenceEquals(other, this))
-			{
-				return true;
-			}
-
-			return GetHashCode() == other.GetHashCode();
-		}
-
-		public override int GetHashCode()
-		{
-			return Blocks.Aggregate(Blocks.Count, (hash, d) => unchecked((hash * 397) ^ d.GetHashCode()));
-		}
-
-		public override string ToString()
-		{
-			return String.Format("Wireframe ({0:#,0} blocks)", Blocks.Count);
+			return Blocks.Select(b => b.Offset(x, y, z, h));
 		}
 
 		public virtual void Clear()
 		{
 			Blocks.Free(true);
+
+			_Hash = null;
 		}
 
 		public virtual void Add(Block3D item)
@@ -272,6 +308,8 @@ namespace Server
 			if (item != null)
 			{
 				Blocks.Add(item);
+
+				_Hash = null;
 			}
 		}
 
@@ -280,6 +318,8 @@ namespace Server
 			if (collection != null)
 			{
 				Blocks.AddRange(collection);
+
+				_Hash = null;
 			}
 		}
 
@@ -293,6 +333,8 @@ namespace Server
 			var success = Blocks.Remove(item);
 
 			Blocks.Free(false);
+
+			_Hash = null;
 
 			return success;
 		}
@@ -308,6 +350,8 @@ namespace Server
 
 			Blocks.Free(false);
 
+			_Hash = null;
+
 			return success;
 		}
 
@@ -320,6 +364,8 @@ namespace Server
 
 			Blocks.RemoveAt(index);
 			Blocks.Free(false);
+
+			_Hash = null;
 		}
 
 		public virtual void RemoveRange(int index, int count)
@@ -331,6 +377,8 @@ namespace Server
 
 			Blocks.RemoveRange(index, count);
 			Blocks.Free(false);
+
+			_Hash = null;
 		}
 
 		public virtual void ForEach(Action<Block3D> action)
@@ -341,6 +389,11 @@ namespace Server
 		public virtual IEnumerator<Block3D> GetEnumerator()
 		{
 			return Blocks.GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
 		}
 
 		public virtual Block3D this[int index]
@@ -359,15 +412,41 @@ namespace Server
 				if (index >= 0 && index < Blocks.Count)
 				{
 					Blocks[index] = value;
+
+					_Hash = null;
 				}
 			}
+		}
+
+		private int? _Hash;
+
+		public int HashCode { get { return _Hash ?? (_Hash = Blocks.GetContentsHashCode(true)).Value; } }
+
+		public override int GetHashCode()
+		{
+			return HashCode;
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is DynamicWireframe && Equals((DynamicWireframe)obj);
+		}
+
+		public bool Equals(DynamicWireframe other)
+		{
+			return !ReferenceEquals(other, null) && (ReferenceEquals(this, other) || GetHashCode() == other.GetHashCode());
+		}
+
+		public override string ToString()
+		{
+			return String.Format("DynamicWireframe ({0:#,0} blocks)", Count);
 		}
 
 		public virtual void Serialize(GenericWriter writer)
 		{
 			writer.SetVersion(0);
 
-			writer.WriteList(Blocks, writer.WriteBlock3D);
+			writer.WriteList(Blocks, (w, b) => w.WriteBlock3D(b));
 		}
 
 		public virtual void Deserialize(GenericReader reader)
@@ -379,12 +458,12 @@ namespace Server
 
 		public static bool operator ==(DynamicWireframe l, DynamicWireframe r)
 		{
-			return !ReferenceEquals(l, null) && l.Equals(r);
+			return ReferenceEquals(l, null) ? ReferenceEquals(r, null) : l.Equals(r);
 		}
 
 		public static bool operator !=(DynamicWireframe l, DynamicWireframe r)
 		{
-			return !ReferenceEquals(l, null) && !l.Equals(r);
+			return ReferenceEquals(l, null) ? !ReferenceEquals(r, null) : !l.Equals(r);
 		}
 	}
 }

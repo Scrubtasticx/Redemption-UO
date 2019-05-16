@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -15,22 +15,21 @@ using System.Linq;
 
 using Server;
 using Server.Items;
+using Server.Mobiles;
 using Server.Regions;
 using Server.Targeting;
 #endregion
 
 namespace VitaNex.Modules.AutoPvP
 {
+	[PropertyObject]
 	public abstract class PvPRegion : BaseRegion
 	{
-		public PvPBattle Battle { get; private set; }
+		[CommandProperty(AutoPvP.Access)]
+		public PvPBattle Battle { get; set; }
 
 		public PvPRegion(PvPBattle battle, string name, params Rectangle3D[] bounds)
-			: base(
-				name,
-				battle.Options.Locations.Map,
-				battle.Options.Locations.BattlePriority,
-				(bounds ?? new Rectangle3D[0]).ZFix().ToArray())
+			: base(name, battle.Options.Locations.Map, battle.Options.Locations.BattlePriority, bounds.Ensure().ZFix().ToArray())
 		{
 			Battle = battle;
 		}
@@ -54,20 +53,57 @@ namespace VitaNex.Modules.AutoPvP
 
 		public override bool AllowBeneficial(Mobile from, Mobile target)
 		{
-			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden &&
-				!Battle.AllowBeneficial(from, target))
+			if (Battle != null)
 			{
-				return false;
+				PlayerMobile x, y;
+
+				if (NotoUtility.Resolve(from, target, out x, out y))
+				{
+					bool handled;
+
+					var result = Battle.AllowBeneficial(x, y, out handled);
+
+					if (handled)
+					{
+						return result;
+					}
+				}
 			}
 
 			return base.AllowBeneficial(from, target);
 		}
 
-		public override bool AllowHarmful(Mobile from, Mobile target)
+#if ServUO
+		public override bool AllowHarmful(Mobile from, IDamageable target)
 		{
-			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden && !Battle.AllowHarmful(from, target))
+			if (target is Mobile)
 			{
-				return false;
+				return AllowHarmful(from, (Mobile)target);
+			}
+
+			return base.AllowHarmful(from, target);
+		}
+
+		public virtual bool AllowHarmful(Mobile from, Mobile target)
+#else
+		public override bool AllowHarmful(Mobile from, Mobile target)
+#endif
+		{
+			if (Battle != null)
+			{
+				PlayerMobile x, y;
+
+				if (NotoUtility.Resolve(from, target, out x, out y))
+				{
+					bool handled;
+
+					var result = Battle.AllowHarmful(x, y, out handled);
+
+					if (handled)
+					{
+						return result;
+					}
+				}
 			}
 
 			return base.AllowHarmful(from, target);
@@ -184,7 +220,21 @@ namespace VitaNex.Modules.AutoPvP
 			base.OnBeneficialAction(helper, target);
 		}
 
+#if ServUO
+		public override bool OnCombatantChange(Mobile m, IDamageable oldMob, IDamageable newMob)
+		{
+			if (oldMob is Mobile || newMob is Mobile)
+			{
+				return OnCombatantChange(m, oldMob as Mobile, newMob as Mobile);
+			}
+
+			return base.OnCombatantChange(m, oldMob, newMob);
+		}
+
+		public virtual bool OnCombatantChange(Mobile m, Mobile oldMob, Mobile newMob)
+#else
 		public override bool OnCombatantChange(Mobile m, Mobile oldMob, Mobile newMob)
+#endif
 		{
 			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden &&
 				!Battle.OnCombatantChange(m, oldMob, newMob))
@@ -207,13 +257,34 @@ namespace VitaNex.Modules.AutoPvP
 
 		public override bool OnDamage(Mobile m, ref int damage)
 		{
-			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden &&
-				!Battle.OnDamage(m.FindMostRecentDamager(true), m, ref damage))
+			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
 			{
-				return false;
+				if (!Battle.CheckDamage(m, ref damage))
+				{
+					return false;
+				}
+
+				Timer.DelayCall(d => OnDamage(m, m.GetLastDamager(true), d), damage);
+
+				return true;
 			}
 
 			return base.OnDamage(m, ref damage);
+		}
+
+#if ServUO
+		protected void OnDamage(Mobile m, IEntity damager, int damage)
+		{
+			OnDamage(m, damager as Mobile, damage);
+		}
+#endif
+
+		protected virtual void OnDamage(Mobile m, Mobile damager, int damage)
+		{
+			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
+			{
+				Battle.OnDamage(damager, m, damage);
+			}
 		}
 
 		public override bool OnBeforeDeath(Mobile m)
@@ -236,7 +307,23 @@ namespace VitaNex.Modules.AutoPvP
 			base.OnDeath(m);
 		}
 
+#if ServUO
+		public override void OnDidHarmful(Mobile harmer, IDamageable harmed)
+		{
+			if (harmed is Mobile)
+			{
+				OnDidHarmful(harmer, (Mobile)harmed);
+			}
+			else
+			{
+				base.OnDidHarmful(harmer, harmed);
+			}
+		}
+
+		public virtual void OnDidHarmful(Mobile harmer, Mobile harmed)
+#else
 		public override void OnDidHarmful(Mobile harmer, Mobile harmed)
+#endif
 		{
 			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
 			{
@@ -296,7 +383,23 @@ namespace VitaNex.Modules.AutoPvP
 			base.OnGotBeneficialAction(helper, target);
 		}
 
+#if ServUO
+		public override void OnGotHarmful(Mobile harmer, IDamageable harmed)
+		{
+			if (harmed is Mobile)
+			{
+				OnGotHarmful(harmer, (Mobile)harmed);
+			}
+			else
+			{
+				base.OnGotHarmful(harmer, harmed);
+			}
+		}
+
+		public virtual void OnGotHarmful(Mobile harmer, Mobile harmed)
+#else
 		public override void OnGotHarmful(Mobile harmer, Mobile harmed)
+#endif
 		{
 			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
 			{
@@ -308,16 +411,34 @@ namespace VitaNex.Modules.AutoPvP
 
 		public override bool OnHeal(Mobile m, ref int heal)
 		{
-			// There is no way to retrieve the healer.
-			// There is no HealStore implementation of the DamageStore feature.
-			//Mobile from = null;
-
-			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden && !Battle.OnHeal(null, m, ref heal))
+			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
 			{
-				return false;
+				if (!Battle.CheckHeal(m, ref heal))
+				{
+					return false;
+				}
+
+				Timer.DelayCall(h => OnHeal(m, m.GetLastHealer(true), h), heal);
+
+				return true;
 			}
 
 			return base.OnHeal(m, ref heal);
+		}
+
+#if ServUO
+		protected void OnHeal(Mobile m, IEntity healer, int heal)
+		{
+			OnHeal(m, healer as Mobile, heal);
+		}
+#endif
+
+		protected virtual void OnHeal(Mobile m, Mobile healer, int heal)
+		{
+			if (Battle != null && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
+			{
+				Battle.OnHeal(healer, m, heal);
+			}
 		}
 
 		public override void OnLocationChanged(Mobile m, Point3D oldLocation)
@@ -403,7 +524,7 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void Serialize(GenericWriter writer)
 		{
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
@@ -414,7 +535,7 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual void Deserialize(GenericReader reader)
 		{
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
@@ -424,9 +545,9 @@ namespace VitaNex.Modules.AutoPvP
 		}
 	}
 
-	[PropertyObject]
 	public class PvPBattleRegion : PvPRegion
 	{
+		[CommandProperty(AutoPvP.Access)]
 		public bool FloorItemDelete { get; set; }
 
 		public PvPBattleRegion(PvPBattle battle)
@@ -443,18 +564,12 @@ namespace VitaNex.Modules.AutoPvP
 
 			if (FloorItemDelete && Battle.State != PvPBattleState.Internal && !Battle.Hidden)
 			{
-				Area.ForEach(
-					r =>
-					{
-						var items = Map.GetItemsInBounds(r.ToRectangle2D());
-
-						items.OfType<Item>()
-							 .Not(i => i == null || i.Deleted || i is Static || i is LOSBlocker || i is Blocker)
-							 .Where(i => i.Movable && i.Visible && i.Decays)
-							 .ForEach(i => i.Delete());
-
-						items.Free();
-					});
+				foreach (var i in Area.SelectMany(r => r.FindEntities<Item>(Map))
+									  .Not(i => i == null || i.Deleted || i is Static || i is LOSBlocker || i is Blocker)
+									  .Where(i => i.Movable && i.Visible && i.Decays))
+				{
+					i.Delete();
+				}
 			}
 		}
 
@@ -462,7 +577,7 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(1);
+			var version = writer.SetVersion(1);
 
 			switch (version)
 			{
@@ -478,7 +593,7 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
@@ -491,7 +606,6 @@ namespace VitaNex.Modules.AutoPvP
 		}
 	}
 
-	[PropertyObject]
 	public class PvPSpectateRegion : PvPRegion
 	{
 		public PvPSpectateRegion(PvPBattle battle)

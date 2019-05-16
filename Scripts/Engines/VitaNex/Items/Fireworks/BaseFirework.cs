@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -170,7 +170,7 @@ namespace VitaNex.Items
 				list.Add(1050043, Crafter.RawName);
 			}
 
-			StringBuilder props = new StringBuilder();
+			var props = new StringBuilder();
 
 			GetProperties(props);
 
@@ -218,7 +218,11 @@ namespace VitaNex.Items
 			Mobile m,
 			CraftSystem craftSystem,
 			Type typeRes,
+#if ServUO
+			ITool tool,
+#else
 			BaseTool tool,
+#endif
 			CraftItem craftItem,
 			int resHue)
 		{
@@ -227,21 +231,25 @@ namespace VitaNex.Items
 				Crafter = m;
 			}
 
+			var context = craftSystem.GetContext(m);
+
+			if (context != null && context.DoNotColor)
+			{
+				Hue = 0;
+			}
+			else if (resHue > 0)
+			{
+				Hue = resHue;
+			}
+
 			if (craftSystem is Pyrotechnics && craftItem != null)
 			{
-				CraftContext context = craftSystem.GetContext(m);
-
-				if (context != null && !context.DoNotColor)
-				{
-					Hue = resHue;
-				}
-
 				var fuses = new List<CraftRes>(craftItem.Resources.Count);
 
 				fuses.SetAll(craftItem.Resources.GetAt);
 				fuses.RemoveAll(res => !res.ItemType.TypeEquals<FireworkFuse>());
 
-				double fuseDelay = FuseDelay.TotalSeconds * fuses.Sum(r => r.Amount);
+				var fuseDelay = FuseDelay.TotalSeconds * fuses.Sum(r => r.Amount);
 
 				fuses.Free(true);
 
@@ -272,15 +280,13 @@ namespace VitaNex.Items
 				return;
 			}
 
-			if (!m.BeginAction(UseLock))
+			if (!m.BeginAction(UseLock, UseDelay))
 			{
 				m.SendMessage("You must wait before you can light another {0}.", this.ResolveName(m));
 				return;
 			}
 
 			MoveToWorld(m.Location, m.Map);
-
-			Timer.DelayCall(UseDelay, () => m.EndAction(UseLock));
 
 			IgniteFuse(m);
 
@@ -345,7 +351,13 @@ namespace VitaNex.Items
 			if (FailEffectID > 0)
 			{
 				var fx = new EffectInfo(
-					GetWorldLocation(), Map, FailEffectID, FailEffectHue, FailEffectSpeed, FailEffectDuration, FailEffectRender);
+					GetWorldLocation(),
+					Map,
+					FailEffectID,
+					FailEffectHue,
+					FailEffectSpeed,
+					FailEffectDuration,
+					FailEffectRender);
 
 				fx.Send();
 			}
@@ -372,31 +384,31 @@ namespace VitaNex.Items
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
 				case 0:
-					{
-						writer.Write(_Token);
-						writer.Write(_Crafter);
+				{
+					writer.Write(_Token);
+					writer.Write(_Crafter);
 
-						writer.Write(UseDelay);
-						writer.Write(FuseDelay);
+					writer.Write(UseDelay);
+					writer.Write(FuseDelay);
 
-						writer.Write(IgniteEffectID);
-						writer.Write(IgniteEffectHue);
-						writer.Write(IgniteEffectSpeed);
-						writer.WriteFlag(IgniteEffectRender);
-						writer.Write(IgniteEffectSound);
+					writer.Write(IgniteEffectID);
+					writer.Write(IgniteEffectHue);
+					writer.Write(IgniteEffectSpeed);
+					writer.WriteFlag(IgniteEffectRender);
+					writer.Write(IgniteEffectSound);
 
-						writer.Write(FailEffectID);
-						writer.Write(FailEffectHue);
-						writer.Write(FailEffectSpeed);
-						writer.Write(FailEffectDuration);
-						writer.WriteFlag(FailEffectRender);
-						writer.Write(FailEffectSound);
-					}
+					writer.Write(FailEffectID);
+					writer.Write(FailEffectHue);
+					writer.Write(FailEffectSpeed);
+					writer.Write(FailEffectDuration);
+					writer.WriteFlag(FailEffectRender);
+					writer.Write(FailEffectSound);
+				}
 					break;
 			}
 		}
@@ -405,31 +417,31 @@ namespace VitaNex.Items
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
 				case 0:
-					{
-						_Token = reader.ReadString();
-						_Crafter = reader.ReadMobile();
+				{
+					_Token = reader.ReadString();
+					_Crafter = reader.ReadMobile();
 
-						UseDelay = reader.ReadTimeSpan();
-						FuseDelay = reader.ReadTimeSpan();
+					UseDelay = reader.ReadTimeSpan();
+					FuseDelay = reader.ReadTimeSpan();
 
-						IgniteEffectID = reader.ReadInt();
-						IgniteEffectHue = reader.ReadInt();
-						IgniteEffectSpeed = reader.ReadInt();
-						IgniteEffectRender = reader.ReadFlag<EffectRender>();
-						IgniteEffectSound = reader.ReadInt();
+					IgniteEffectID = reader.ReadInt();
+					IgniteEffectHue = reader.ReadInt();
+					IgniteEffectSpeed = reader.ReadInt();
+					IgniteEffectRender = reader.ReadFlag<EffectRender>();
+					IgniteEffectSound = reader.ReadInt();
 
-						FailEffectID = reader.ReadInt();
-						FailEffectHue = reader.ReadInt();
-						FailEffectSpeed = reader.ReadInt();
-						FailEffectDuration = reader.ReadInt();
-						FailEffectRender = reader.ReadFlag<EffectRender>();
-						FailEffectSound = reader.ReadInt();
-					}
+					FailEffectID = reader.ReadInt();
+					FailEffectHue = reader.ReadInt();
+					FailEffectSpeed = reader.ReadInt();
+					FailEffectDuration = reader.ReadInt();
+					FailEffectRender = reader.ReadFlag<EffectRender>();
+					FailEffectSound = reader.ReadInt();
+				}
 					break;
 			}
 		}

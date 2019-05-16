@@ -3,20 +3,27 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
+using System;
+
 using Server;
+
+using VitaNex.Reflection;
 #endregion
 
 namespace VitaNex.Modules.AutoPvP
 {
 	public class PvPBattleRules : PropertyObject
 	{
+		private readonly object _CopyLock = new object();
+		private PropertyList<PvPBattleRules> _CopyStore;
+
 		[CommandProperty(AutoPvP.Access)]
 		public bool AllowSpeech { get; set; }
 
@@ -74,15 +81,12 @@ namespace VitaNex.Modules.AutoPvP
 		[CommandProperty(AutoPvP.Access)]
 		public bool CanUseStuckMenu { get; set; }
 
+		[CommandProperty(AutoPvP.Access)]
+		public bool CanEquip { get; set; }
+
 		public PvPBattleRules()
 		{
-			AllowBeneficial = true;
-			AllowHarmful = true;
-			AllowSpeech = true;
-			CanBeDamaged = true;
-			CanDamageEnemyTeam = true;
-			CanHeal = true;
-			CanHealOwnTeam = true;
+			SetDefaults();
 		}
 
 		public PvPBattleRules(GenericReader reader)
@@ -94,30 +98,7 @@ namespace VitaNex.Modules.AutoPvP
 			return "Battle Rules";
 		}
 
-		public override void Clear()
-		{
-			AllowBeneficial = false;
-			AllowHarmful = false;
-			AllowHousing = false;
-			AllowPets = false;
-			AllowSpawn = false;
-			AllowSpeech = false;
-			CanBeDamaged = false;
-			CanDamageEnemyTeam = false;
-			CanDamageOwnTeam = false;
-			CanDie = false;
-			CanHeal = false;
-			CanHealEnemyTeam = false;
-			CanHealOwnTeam = false;
-			CanMount = false;
-			CanFly = false;
-			CanMountEthereal = false;
-			CanMoveThrough = false;
-			CanResurrect = false;
-			CanUseStuckMenu = false;
-		}
-
-		public override void Reset()
+		public void SetDefaults()
 		{
 			AllowBeneficial = true;
 			AllowHarmful = true;
@@ -129,25 +110,62 @@ namespace VitaNex.Modules.AutoPvP
 			CanDamageEnemyTeam = true;
 			CanDamageOwnTeam = false;
 			CanDie = false;
+			CanEquip = true;
+			CanFly = false;
 			CanHeal = true;
 			CanHealEnemyTeam = false;
 			CanHealOwnTeam = true;
 			CanMount = false;
-			CanFly = false;
 			CanMountEthereal = false;
 			CanMoveThrough = false;
 			CanResurrect = false;
 			CanUseStuckMenu = false;
 		}
 
+		public override void Clear()
+		{
+			SetDefaults();
+		}
+
+		public override void Reset()
+		{
+			SetDefaults();
+		}
+
+		public void CopyFrom(PvPBattleRules source)
+		{
+			source.CopyTo(this);
+		}
+
+		public void CopyTo(PvPBattleRules target)
+		{
+			lock (_CopyLock)
+			{
+				if (_CopyStore == null)
+				{
+					_CopyStore = new PropertyList<PvPBattleRules>
+					{
+						Filter = p => p.Name != "InvokeReset" && p.Name != "InvokeClear" && p.PropertyType.IsEqual<bool>()
+					};
+				}
+
+				_CopyStore.Deserialize(this);
+				_CopyStore.Serialize(target);
+				_CopyStore.Clear();
+			}
+		}
+
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(2);
+			var version = writer.SetVersion(3);
 
 			switch (version)
 			{
+				case 3:
+					writer.Write(CanEquip);
+					goto case 2;
 				case 2:
 					writer.Write(CanMoveThrough);
 					goto case 1;
@@ -155,25 +173,25 @@ namespace VitaNex.Modules.AutoPvP
 					writer.Write(CanFly);
 					goto case 0;
 				case 0:
-					{
-						writer.Write(AllowBeneficial);
-						writer.Write(AllowHarmful);
-						writer.Write(AllowHousing);
-						writer.Write(AllowPets);
-						writer.Write(AllowSpawn);
-						writer.Write(AllowSpeech);
-						writer.Write(CanBeDamaged);
-						writer.Write(CanDamageEnemyTeam);
-						writer.Write(CanDamageOwnTeam);
-						writer.Write(CanDie);
-						writer.Write(CanHeal);
-						writer.Write(CanHealEnemyTeam);
-						writer.Write(CanHealOwnTeam);
-						writer.Write(CanMount);
-						writer.Write(CanMountEthereal);
-						writer.Write(CanResurrect);
-						writer.Write(CanUseStuckMenu);
-					}
+				{
+					writer.Write(AllowBeneficial);
+					writer.Write(AllowHarmful);
+					writer.Write(AllowHousing);
+					writer.Write(AllowPets);
+					writer.Write(AllowSpawn);
+					writer.Write(AllowSpeech);
+					writer.Write(CanBeDamaged);
+					writer.Write(CanDamageEnemyTeam);
+					writer.Write(CanDamageOwnTeam);
+					writer.Write(CanDie);
+					writer.Write(CanHeal);
+					writer.Write(CanHealEnemyTeam);
+					writer.Write(CanHealOwnTeam);
+					writer.Write(CanMount);
+					writer.Write(CanMountEthereal);
+					writer.Write(CanResurrect);
+					writer.Write(CanUseStuckMenu);
+				}
 					break;
 			}
 		}
@@ -182,10 +200,15 @@ namespace VitaNex.Modules.AutoPvP
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			SetDefaults();
+
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
+				case 3:
+					CanEquip = reader.ReadBool();
+					goto case 2;
 				case 2:
 					CanMoveThrough = reader.ReadBool();
 					goto case 1;
@@ -193,25 +216,25 @@ namespace VitaNex.Modules.AutoPvP
 					CanFly = reader.ReadBool();
 					goto case 0;
 				case 0:
-					{
-						AllowBeneficial = reader.ReadBool();
-						AllowHarmful = reader.ReadBool();
-						AllowHousing = reader.ReadBool();
-						AllowPets = reader.ReadBool();
-						AllowSpawn = reader.ReadBool();
-						AllowSpeech = reader.ReadBool();
-						CanBeDamaged = reader.ReadBool();
-						CanDamageEnemyTeam = reader.ReadBool();
-						CanDamageOwnTeam = reader.ReadBool();
-						CanDie = reader.ReadBool();
-						CanHeal = reader.ReadBool();
-						CanHealEnemyTeam = reader.ReadBool();
-						CanHealOwnTeam = reader.ReadBool();
-						CanMount = reader.ReadBool();
-						CanMountEthereal = reader.ReadBool();
-						CanResurrect = reader.ReadBool();
-						CanUseStuckMenu = reader.ReadBool();
-					}
+				{
+					AllowBeneficial = reader.ReadBool();
+					AllowHarmful = reader.ReadBool();
+					AllowHousing = reader.ReadBool();
+					AllowPets = reader.ReadBool();
+					AllowSpawn = reader.ReadBool();
+					AllowSpeech = reader.ReadBool();
+					CanBeDamaged = reader.ReadBool();
+					CanDamageEnemyTeam = reader.ReadBool();
+					CanDamageOwnTeam = reader.ReadBool();
+					CanDie = reader.ReadBool();
+					CanHeal = reader.ReadBool();
+					CanHealEnemyTeam = reader.ReadBool();
+					CanHealOwnTeam = reader.ReadBool();
+					CanMount = reader.ReadBool();
+					CanMountEthereal = reader.ReadBool();
+					CanResurrect = reader.ReadBool();
+					CanUseStuckMenu = reader.ReadBool();
+				}
 					break;
 			}
 		}

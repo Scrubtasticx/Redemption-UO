@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -21,7 +21,13 @@ namespace VitaNex.SuperGumps
 {
 	public abstract partial class SuperGump
 	{
-		public Dictionary<GumpCheck, Action<GumpCheck, bool>> Switches { get; private set; }
+		private Dictionary<GumpCheck, Action<GumpCheck, bool>> _Switches;
+
+		public Dictionary<GumpCheck, Action<GumpCheck, bool>> Switches
+		{
+			get { return _Switches; }
+			protected set { _Switches = value; }
+		}
 
 		public Action<GumpCheck, bool> SwitchHandler { get; set; }
 
@@ -57,14 +63,7 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			if (!Switches.ContainsKey(entry))
-			{
-				Switches.Add(entry, handler);
-			}
-			else
-			{
-				Switches[entry] = handler;
-			}
+			Switches[entry] = handler;
 
 			Add(entry);
 		}

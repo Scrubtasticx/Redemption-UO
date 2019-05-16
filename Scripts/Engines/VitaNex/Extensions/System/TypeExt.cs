@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -15,25 +15,227 @@ using System.Linq;
 using System.Reflection;
 
 using Server;
+
+using VitaNex.Crypto;
 #endregion
 
 namespace System
 {
 	public static class TypeExtUtility
 	{
-		private static readonly Dictionary<Type, Type[]> _ChildrenCache = new Dictionary<Type, Type[]>();
-		private static readonly Dictionary<Type, Type[]> _ConstructableChildrenCache = new Dictionary<Type, Type[]>();
+		private static readonly Dictionary<Type, List<Type>> _ChildrenCache;
+		private static readonly Dictionary<Type, List<Type>> _ConstructableChildrenCache;
 
-		public static TAttribute[] GetCustomAttributes<TAttribute>(this Type t, bool inherit) where TAttribute : Attribute
+		private static readonly Dictionary<Type, int> _ValueHashCache;
+		private static readonly Dictionary<Type, string> _StringCache;
+
+		static TypeExtUtility()
+		{
+			_ChildrenCache = new Dictionary<Type, List<Type>>(0x100);
+			_ConstructableChildrenCache = new Dictionary<Type, List<Type>>(0x100);
+
+			_ValueHashCache = new Dictionary<Type, int>(0x400);
+			_StringCache = new Dictionary<Type, string>(0x400);
+		}
+
+		private static string FormatName(string value)
+		{
+			var i = value.IndexOf('`');
+
+			return (i > 0 ? value.Substring(0, i) : value).SpaceWords();
+		}
+
+		private static readonly object[] _EmptyArgs = new object[0];
+
+		public static string ResolveName(this Type t)
+		{
+			return ResolveName(t, _EmptyArgs);
+		}
+
+		public static string ResolveName(this Type t, params object[] args)
+		{
+			if (SimpleType.IsSimpleType(t))
+			{
+				return FormatName(t.Name);
+			}
+
+			if (t.IsAbstract || !t.HasInterface<IEntity>())
+			{
+				return FormatName(t.Name);
+			}
+
+			if (args.IsNullOrEmpty() ? !t.IsConstructable() : !t.IsConstructable(Type.GetTypeArray(args)))
+			{
+				return FormatName(t.Name);
+			}
+
+			string value;
+
+			if (_StringCache.TryGetValue(t, out value))
+			{
+				return value;
+			}
+
+			value = String.Empty;
+
+			var o = t.CreateInstanceSafe<IEntity>(args);
+
+			if (o != null)
+			{
+				try
+				{
+					if (o is Mobile)
+					{
+						value = ((Mobile)o).RawName;
+					}
+					else if (o is Item)
+					{
+						value = ((Item)o).ResolveName();
+					}
+					else
+					{
+						o.GetPropertyValue("Name", out value);
+					}
+				}
+				catch
+				{ }
+				finally
+				{
+					o.Delete();
+				}
+			}
+
+			if (String.IsNullOrWhiteSpace(value))
+			{
+				value = FormatName(t.Name);
+			}
+
+			if (o == null || args.IsNullOrEmpty())
+			{
+				_StringCache[t] = value;
+			}
+
+			return value;
+		}
+
+		public static int GetValueHashCode(this Type t)
+		{
+			if (t == null)
+			{
+				return 0;
+			}
+
+			int hash;
+
+			if (!_ValueHashCache.TryGetValue(t, out hash) || hash == 0)
+			{
+				using (var c = new CryptoHashCode(CryptoHashType.MD5, t.FullName))
+				{
+					_ValueHashCache[t] = hash = c.ValueHash;
+				}
+			}
+
+			return hash;
+		}
+
+		public static Type[] GetTypeCache(this Assembly asm)
+		{
+			return ScriptCompiler.GetTypeCache(asm).Types;
+		}
+
+		public static Type[] GetHierarchy(this Type t)
+		{
+			return GetHierarchy(t, false);
+		}
+
+		public static Type[] GetHierarchy(this Type t, bool self)
+		{
+			return EnumerateHierarchy(t, self).ToArray();
+		}
+
+		public static IEnumerable<Type> EnumerateHierarchy(this Type t)
+		{
+			return EnumerateHierarchy(t, false);
+		}
+
+		public static IEnumerable<Type> EnumerateHierarchy(this Type t, bool self)
+		{
+			if (t == null)
+			{
+				yield break;
+			}
+
+			if (self)
+			{
+				yield return t;
+			}
+
+			while (t.BaseType != null)
+			{
+				yield return t = t.BaseType;
+			}
+		}
+
+		public static Type FindParent<T>(this Type type)
+		{
+			var ot = typeof(T);
+
+			return EnumerateHierarchy(type, false).FirstOrDefault(pt => pt == ot);
+		}
+
+		public static bool TryFindParent<T>(this Type type, out Type parent)
+		{
+			return (parent = FindParent<T>(type)) != null;
+		}
+
+		public static Type FindParent<T>(this Type type, Func<Type, bool> predicate)
+		{
+			var ot = typeof(T);
+
+			return EnumerateHierarchy(type, false).Where(t => t == ot).FirstOrDefault(predicate);
+		}
+
+		public static bool TryFindParent<T>(this Type type, Func<Type, bool> predicate, out Type parent)
+		{
+			return (parent = FindParent<T>(type, predicate)) != null;
+		}
+
+		public static Type FindParent(this Type type, Func<Type, bool> predicate)
+		{
+			return EnumerateHierarchy(type, false).FirstOrDefault(predicate);
+		}
+
+		public static bool TryFindParent(this Type type, Func<Type, bool> predicate, out Type parent)
+		{
+			return (parent = FindParent(type, predicate)) != null;
+		}
+
+		public static bool GetCustomAttributes<TAttribute>(this Type t, bool inherit, out TAttribute[] attrs)
+			where TAttribute : Attribute
+		{
+			attrs = GetCustomAttributes<TAttribute>(t, inherit);
+			return attrs != null && attrs.Length > 0;
+		}
+
+		public static TAttribute[] GetCustomAttributes<TAttribute>(this Type t, bool inherit)
+			where TAttribute : Attribute
 		{
 			return t != null
-					   ? t.GetCustomAttributes(typeof(TAttribute), inherit).OfType<TAttribute>().ToArray()
-					   : new TAttribute[0];
+				? t.GetCustomAttributes(typeof(TAttribute), inherit).Cast<TAttribute>().ToArray()
+				: new TAttribute[0];
+		}
+
+		public static bool HasCustomAttribute<TAttribute>(this Type t, bool inherit)
+			where TAttribute : Attribute
+		{
+			var attrs = GetCustomAttributes<TAttribute>(t, inherit);
+
+			return attrs != null && attrs.Length > 0;
 		}
 
 		public static int CompareTo(this Type t, Type other)
 		{
-			int result = 0;
+			var result = 0;
 
 			if (t.CompareNull(other, ref result))
 			{
@@ -55,9 +257,27 @@ namespace System
 			return 1;
 		}
 
+		public static bool IsEqual(this Type a, string bName)
+		{
+			return IsEqual(a, bName, true);
+		}
+
+		public static bool IsEqual(this Type a, string bName, bool ignoreCase)
+		{
+			return IsEqual(a, bName, ignoreCase, bName.ContainsAny('.', '+'));
+		}
+
+		public static bool IsEqual(this Type a, string bName, bool ignoreCase, bool fullName)
+		{
+			var b = Type.GetType(bName) ??
+					(fullName ? ScriptCompiler.FindTypeByFullName(bName) : ScriptCompiler.FindTypeByName(bName));
+
+			return IsEqual(a, b);
+		}
+
 		public static bool IsEqual(this Type a, Type b)
 		{
-			return a != null && b != null && a == b;
+			return a == b;
 		}
 
 		public static bool IsEqual<TObj>(this Type t)
@@ -65,9 +285,27 @@ namespace System
 			return IsEqual(t, typeof(TObj));
 		}
 
+		public static bool IsEqualOrChildOf(this Type a, string bName)
+		{
+			return IsEqualOrChildOf(a, bName, true);
+		}
+
+		public static bool IsEqualOrChildOf(this Type a, string bName, bool ignoreCase)
+		{
+			return IsEqualOrChildOf(a, bName, ignoreCase, bName.ContainsAny('.', '+'));
+		}
+
+		public static bool IsEqualOrChildOf(this Type a, string bName, bool ignoreCase, bool fullName)
+		{
+			var b = Type.GetType(bName) ??
+					(fullName ? ScriptCompiler.FindTypeByFullName(bName) : ScriptCompiler.FindTypeByName(bName));
+
+			return IsEqualOrChildOf(a, b);
+		}
+
 		public static bool IsEqualOrChildOf(this Type a, Type b)
 		{
-			return a != null && b != null && (a == b || a.IsChildOf(b));
+			return IsEqual(a, b) || IsChildOf(a, b);
 		}
 
 		public static bool IsEqualOrChildOf<TObj>(this Type t)
@@ -86,6 +324,14 @@ namespace System
 			return IsChildOf(t, typeof(TObj));
 		}
 
+		public static bool HasInterface(this Type t, string i)
+		{
+			var iType = Type.GetType(i, false) ??
+						(i.IndexOf('.') < 0 ? ScriptCompiler.FindTypeByName(i) : ScriptCompiler.FindTypeByFullName(i));
+
+			return iType != null && iType.IsInterface && HasInterface(t, iType);
+		}
+
 		public static bool HasInterface<TObj>(this Type t)
 		{
 			return HasInterface(t, typeof(TObj));
@@ -98,7 +344,7 @@ namespace System
 
 		public static bool IsConstructable(this Type a)
 		{
-			return IsConstructable(a, new Type[0]);
+			return IsConstructable(a, Type.EmptyTypes);
 		}
 
 		public static bool IsConstructable(this Type a, Type[] argTypes)
@@ -113,12 +359,12 @@ namespace System
 
 		public static bool IsConstructableFrom(this Type a, Type b)
 		{
-			if (a == null || b == null || a.IsAbstract || !a.IsChildOf(b))
+			if (a == null || b == null || a.IsAbstract || !IsChildOf(a, b))
 			{
 				return false;
 			}
 
-			return a.GetConstructors().Length > 0;
+			return a.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Length > 0;
 		}
 
 		public static bool IsConstructableFrom<TObj>(this Type t)
@@ -128,7 +374,7 @@ namespace System
 
 		public static bool IsConstructableFrom(this Type a, Type b, Type[] argTypes)
 		{
-			if (a == null || b == null || a.IsAbstract || !a.IsChildOf(b))
+			if (a == null || b == null || a.IsAbstract || !IsChildOf(a, b))
 			{
 				return false;
 			}
@@ -141,106 +387,89 @@ namespace System
 			return IsConstructableFrom(t, typeof(TObj), argTypes);
 		}
 
-		public static Type[] GetConstructableChildren(this Type type, Predicate<Type> predicate = null)
+		public static Type[] GetChildren(this Type type, Func<Type, bool> predicate = null)
 		{
-			if (type == null)
-			{
-				return new Type[0];
-			}
-
-			if (_ConstructableChildrenCache.ContainsKey(type))
-			{
-				return _ConstructableChildrenCache[type];
-			}
-
-			if (_ConstructableChildrenCache.Count >= 100)
-			{
-				_ConstructableChildrenCache.Pop();
-			}
-
-			var types = new List<Type>(100);
-			var assemblies = new List<Assembly>(ScriptCompiler.Assemblies);
-
-			if (!assemblies.Contains(Assembly.GetCallingAssembly()))
-			{
-				assemblies.Add(Assembly.GetCallingAssembly());
-			}
-
-			assemblies.ForEach(
-				asm => asm.GetTypes().ForEach(
-					t =>
-					{
-						if (t.IsEqual(type) || !t.IsChildOf(type) || !t.IsConstructableFrom(type))
-						{
-							return;
-						}
-
-						if (predicate != null)
-						{
-							if (predicate(t))
-							{
-								types.Add(t);
-							}
-						}
-						else
-						{
-							types.Add(t);
-						}
-					}));
-
-			var ret = types.ToArray();
-
-			types.Free(true);
-
-			if (ret.Length <= 100)
-			{
-				_ConstructableChildrenCache.Add(type, ret);
-			}
-
-			return ret;
+			return FindChildren(type, predicate).ToArray();
 		}
 
-		public static Type[] GetChildren(this Type type, Predicate<Type> predicate = null)
+		public static IEnumerable<Type> FindChildren(this Type type, Func<Type, bool> predicate = null)
 		{
 			if (type == null)
 			{
-				return new Type[0];
+				return Type.EmptyTypes;
 			}
 
-			if (_ChildrenCache.ContainsKey(type))
+			var types = _ChildrenCache.GetValue(type);
+
+			if (types == null)
 			{
-				return _ChildrenCache[type];
+				var asm = ScriptCompiler.Assemblies.With(Core.Assembly, Assembly.GetCallingAssembly()).ToList();
+
+				asm.Prune();
+
+				types = asm.Select(GetTypeCache).SelectMany(o => o.Where(t => !IsEqual(t, type) && IsChildOf(t, type))).ToList();
+
+				asm.Free(true);
+
+				if (types.Count > 0 && types.Count <= 0x100)
+				{
+					_ChildrenCache[type] = types;
+				}
 			}
 
-			if (_ChildrenCache.Count >= 100)
+			if (_ChildrenCache.Count >= 0x100)
 			{
-				_ChildrenCache.Pop();
+				_ChildrenCache.Pop().Value.Free(true);
 			}
 
-			var asm = new List<Assembly>(ScriptCompiler.Assemblies);
+			return predicate != null ? types.Where(predicate) : types.AsEnumerable();
+		}
 
-			asm.AddOrReplace(Assembly.GetCallingAssembly());
+		public static Type[] GetConstructableChildren(this Type type, Func<Type, bool> predicate = null)
+		{
+			return FindConstructableChildren(type, predicate).ToArray();
+		}
 
-			var ret =
-				asm.SelectMany(a => a.GetTypes().Where(t => t.IsChildOf(type) && (predicate == null || predicate(t)))).ToArray();
-
-			asm.Free(true);
-
-			if (ret.Length <= 100)
+		public static IEnumerable<Type> FindConstructableChildren(this Type type, Func<Type, bool> predicate = null)
+		{
+			if (type == null)
 			{
-				_ChildrenCache.Add(type, ret);
+				return Type.EmptyTypes;
 			}
 
-			return ret;
+			var types = _ConstructableChildrenCache.GetValue(type);
+
+			if (types == null)
+			{
+				types = FindChildren(type).Where(t => IsConstructableFrom(t, type)).ToList();
+
+				if (types.Count > 0 && types.Count <= 0x100)
+				{
+					_ConstructableChildrenCache[type] = types;
+				}
+			}
+
+			if (_ConstructableChildrenCache.Count >= 0x100)
+			{
+				_ConstructableChildrenCache.Pop().Value.Free(true);
+			}
+
+			return predicate != null ? types.Where(predicate) : types.AsEnumerable();
 		}
 
 		public static TObj CreateInstance<TObj>(this Type t, params object[] args)
 		{
-			return t == null || t.IsAbstract || t.IsInterface
-					   ? default(TObj)
-					   : ((args == null || args.Length == 0)
-							  ? (TObj)Activator.CreateInstance(t)
-							  : (TObj)Activator.CreateInstance(t, args));
+			if (t == null || t.IsAbstract || t.IsInterface || t.IsEnum)
+			{
+				return default(TObj);
+			}
+
+			if (args == null || args.Length == 0)
+			{
+				return (TObj)Activator.CreateInstance(t, true);
+			}
+
+			return (TObj)Activator.CreateInstance(t, args);
 		}
 
 		public static TObj CreateInstanceSafe<TObj>(this Type t, params object[] args)
@@ -253,6 +482,11 @@ namespace System
 			{
 				return default(TObj);
 			}
+		}
+
+		public static object CreateInstanceUnsafe(this Type t, params object[] args)
+		{
+			return CreateInstance<object>(t, args);
 		}
 
 		public static object CreateInstance(this Type t, params object[] args)

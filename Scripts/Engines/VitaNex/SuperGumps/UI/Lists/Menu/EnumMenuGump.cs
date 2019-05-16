@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,21 +12,21 @@
 #region References
 using System;
 
+using Server;
 using Server.Gumps;
-using Server.Mobiles;
 #endregion
 
 namespace VitaNex.SuperGumps.UI
 {
 	public class EnumMenuGump<TEnum> : MenuGump
-		where TEnum : struct
+		where TEnum : struct, IComparable, IFormattable, IConvertible
 	{
 		public Action<TEnum> Callback { get; set; }
 
 		public TEnum DefaultValue { get; set; }
 
 		public EnumMenuGump(
-			PlayerMobile user,
+			Mobile user,
 			Gump parent = null,
 			GumpButton clicked = null,
 			TEnum def = default(TEnum),
@@ -49,11 +49,11 @@ namespace VitaNex.SuperGumps.UI
 		{
 			if (typeof(TEnum).IsEnum)
 			{
-				var vals = (default(TEnum) as Enum).GetValues<TEnum>();
+				var vals = (default(TEnum) as Enum).EnumerateValues<TEnum>(false);
 
 				foreach (var val in vals)
 				{
-					ListGumpEntry e = new ListGumpEntry(val.ToString(), b => OnSelected(val));
+					var e = new ListGumpEntry(val.ToString(), b => OnSelected(val));
 
 					if (Equals(val, DefaultValue))
 					{

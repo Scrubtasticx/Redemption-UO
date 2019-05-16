@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -37,6 +37,8 @@ namespace VitaNex.FX
 
 		public virtual bool Deferred { get; set; }
 
+		public int Count { get { return Queue.Count; } }
+
 		public EffectQueue(Action callback = null, Action<TEffectInfo> handler = null, bool deferred = true)
 		{
 			Queue = new Queue<TEffectInfo>();
@@ -54,7 +56,10 @@ namespace VitaNex.FX
 		}
 
 		public EffectQueue(
-			IEnumerable<TEffectInfo> queue, Action callback = null, Action<TEffectInfo> handler = null, bool deferred = true)
+			IEnumerable<TEffectInfo> queue,
+			Action callback = null,
+			Action<TEffectInfo> handler = null,
+			bool deferred = true)
 		{
 			Queue = new Queue<TEffectInfo>(queue);
 			Callback = callback;
@@ -78,13 +83,21 @@ namespace VitaNex.FX
 
 			//GC.SuppressFinalize(this);
 
-			Queue.Free(true);
-			Queue = null;
-			Handler = null;
-			Callback = null;
+			if (DeferTimer != null)
+			{
+				DeferTimer.Stop();
+				DeferTimer = null;
+			}
 
 			Processed = 0;
 			Processing = false;
+
+			Queue.Free(true);
+			Queue = null;
+
+			Handler = null;
+			Mutator = null;
+			Callback = null;
 		}
 
 		IEnumerator IEnumerable.GetEnumerator()
@@ -115,6 +128,11 @@ namespace VitaNex.FX
 			return Queue.Dequeue();
 		}
 
+		public virtual void Clear()
+		{
+			Queue.Clear();
+		}
+
 		public virtual void Process()
 		{
 			if (IsDisposed /* || Processing*/)
@@ -130,7 +148,7 @@ namespace VitaNex.FX
 
 			Processing = true;
 
-			TEffectInfo info = Dequeue();
+			var info = Dequeue();
 
 			if (!OnProcess(info))
 			{
@@ -141,30 +159,37 @@ namespace VitaNex.FX
 
 			++Processed;
 
-			if (Deferred)
-			{
-				DeferTimer = Timer.DelayCall(
-					GetDeferDelay(info),
-					() =>
-					{
-						if (DeferTimer != null)
-						{
-							DeferTimer.Stop();
-							DeferTimer = null;
-						}
-
-						Process();
-					});
-			}
-			else
+			if (!Deferred)
 			{
 				Process();
+				return;
 			}
+
+			var delay = GetDeferDelay(info);
+
+			if (delay > TimeSpan.Zero)
+			{
+				DeferTimer = Timer.DelayCall(delay, InternalDeferredCallback);
+				return;
+			}
+
+			InternalDeferredCallback();
+		}
+
+		private void InternalDeferredCallback()
+		{
+			if (DeferTimer != null)
+			{
+				DeferTimer.Stop();
+				DeferTimer = null;
+			}
+
+			Process();
 		}
 
 		protected virtual bool OnProcess(TEffectInfo info)
 		{
-			if (IsDisposed || info == null)
+			if (IsDisposed || info == null || info.IsDisposed)
 			{
 				return false;
 			}
@@ -172,6 +197,11 @@ namespace VitaNex.FX
 			if (Mutator != null)
 			{
 				Mutator(info);
+			}
+
+			if (info.IsDisposed)
+			{
+				return false;
 			}
 
 			info.Send();
@@ -205,8 +235,8 @@ namespace VitaNex.FX
 		public virtual TimeSpan GetDeferDelay(TEffectInfo info)
 		{
 			return !IsDisposed && info != null
-					   ? TimeSpan.FromMilliseconds(info.Delay.TotalMilliseconds + (info.Duration * 100.0))
-					   : TimeSpan.Zero;
+				? TimeSpan.FromMilliseconds(info.Delay.TotalMilliseconds + ((info.Duration * 100.0) / info.Speed))
+				: TimeSpan.Zero;
 		}
 	}
 
@@ -221,7 +251,10 @@ namespace VitaNex.FX
 		{ }
 
 		public EffectQueue(
-			IEnumerable<EffectInfo> queue, Action callback = null, Action<EffectInfo> handler = null, bool deferred = true)
+			IEnumerable<EffectInfo> queue,
+			Action callback = null,
+			Action<EffectInfo> handler = null,
+			bool deferred = true)
 			: base(queue, callback, handler, deferred)
 		{ }
 	}
@@ -235,7 +268,10 @@ namespace VitaNex.FX
 		{ }
 
 		public MovingEffectQueue(
-			int capacity, Action callback = null, Action<MovingEffectInfo> handler = null, bool deferred = true)
+			int capacity,
+			Action callback = null,
+			Action<MovingEffectInfo> handler = null,
+			bool deferred = true)
 			: base(capacity, callback, handler, deferred)
 		{ }
 
@@ -256,17 +292,20 @@ namespace VitaNex.FX
 
 			info.Send();
 
-			if (Handler != null)
+			if (Handler == null)
 			{
-				Timer.DelayCall(
-					GetDeferDelay(info),
-					() =>
-					{
-						if (Handler != null)
-						{
-							Handler(info);
-						}
-					});
+				return true;
+			}
+
+			var d = GetDeferDelay(info);
+
+			if (d > TimeSpan.Zero)
+			{
+				Timer.DelayCall(d, h => h(info), Handler);
+			}
+			else
+			{
+				Handler(info);
 			}
 
 			return true;

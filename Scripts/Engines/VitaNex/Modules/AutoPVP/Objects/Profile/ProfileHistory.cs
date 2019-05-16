@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -44,18 +44,9 @@ namespace VitaNex.Modules.AutoPvP
 
 				foreach (var entry in entries)
 				{
-					PvPSeason season = AutoPvP.EnsureSeason(entry.Season);
+					var season = AutoPvP.EnsureSeason(entry.Season);
 
-					if (!Entries.ContainsKey(season.Number))
-					{
-						Entries.Add(season.Number, entry);
-					}
-					else
-					{
-						Entries[season.Number] = entry;
-					}
-
-					if (Entries[season.Number] == null)
+					if (season != null)
 					{
 						Entries[season.Number] = entry;
 					}
@@ -82,43 +73,47 @@ namespace VitaNex.Modules.AutoPvP
 
 		public virtual PvPProfileHistoryEntry EnsureEntry(PvPSeason season, bool replace = false)
 		{
-			if (!Entries.ContainsKey(season.Number))
+			PvPProfileHistoryEntry entry;
+
+			if (!Entries.TryGetValue(season.Number, out entry) || entry == null || replace)
 			{
-				Entries.Add(season.Number, new PvPProfileHistoryEntry(season.Number));
-			}
-			else if (replace)
-			{
-				Entries[season.Number] = new PvPProfileHistoryEntry(season.Number);
+				Entries[season.Number] = entry = new PvPProfileHistoryEntry(season.Number);
 			}
 
-			return Entries[season.Number] ?? (Entries[season.Number] = new PvPProfileHistoryEntry(season.Number));
+			return entry;
 		}
 
 		public virtual void Serialize(GenericWriter writer)
 		{
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
 				case 0:
+				{
 					writer.WriteBlockDictionary(Entries, (w, k, e) => w.WriteType(e, t => e.Serialize(w)));
+				}
 					break;
 			}
 		}
 
 		public virtual void Deserialize(GenericReader reader)
 		{
-			int version = reader.ReadInt();
+			var version = reader.ReadInt();
 
 			switch (version)
 			{
 				case 0:
+				{
 					Entries = reader.ReadBlockDictionary(
 						r =>
 						{
-							PvPProfileHistoryEntry e = r.ReadTypeCreate<PvPProfileHistoryEntry>(r);
+							var e = r.ReadTypeCreate<PvPProfileHistoryEntry>(r);
+
 							return new KeyValuePair<int, PvPProfileHistoryEntry>(e.Season, e);
-						});
+						},
+						Entries);
+				}
 					break;
 			}
 		}

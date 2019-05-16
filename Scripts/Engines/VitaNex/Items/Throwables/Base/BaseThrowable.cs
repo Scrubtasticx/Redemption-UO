@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -96,7 +96,11 @@ namespace VitaNex.Items
 		[CommandProperty(AccessLevel.GameMaster)]
 		public virtual Mobile User { get; set; }
 
-		public BaseThrowable(int itemID, int amount = 1)
+		public BaseThrowable(int itemID)
+			: this(itemID, 1)
+		{ }
+
+		public BaseThrowable(int itemID, int amount)
 			: base(itemID)
 		{
 			Stackable = true;
@@ -110,8 +114,8 @@ namespace VitaNex.Items
 			Consumable = true;
 			ClearHands = true;
 			DismountUser = true;
-			EffectID = ItemID;
-			EffectHue = Hue;
+			EffectID = 0;
+			EffectHue = 0;
 			EffectRender = EffectRender.Normal;
 			EffectSpeed = 10;
 			ThrowSound = -1;
@@ -278,7 +282,10 @@ namespace VitaNex.Items
 
 			OnBeforeThrownAt(m, target);
 
-			new MovingEffectInfo(m, target, target.Map, EffectID, EffectHue, EffectSpeed, EffectRender).MovingImpact(
+			var effect = EffectID > 0 ? EffectID : ItemID;
+			var hue = EffectHue > 0 ? EffectHue : Hue;
+
+			new MovingEffectInfo(m, target, target.Map, effect, hue, EffectSpeed, EffectRender).MovingImpact(
 				() => FinishThrow(m, target));
 		}
 
@@ -303,9 +310,15 @@ namespace VitaNex.Items
 			}
 
 			m.LocalOverheadMessage(
-				MessageType.Emote, 0x55, true, String.Format("You begin to swing the {0}...", this.ResolveName(m)));
+				MessageType.Emote,
+				0x55,
+				true,
+				String.Format("You begin to swing the {0}...", this.ResolveName(m)));
 			m.NonlocalOverheadMessage(
-				MessageType.Emote, 0x55, true, String.Format("{0} begins to swing the {1}...", m.RawName, this.ResolveName(m)));
+				MessageType.Emote,
+				0x55,
+				true,
+				String.Format("{0} begins to swing the {1}...", m.RawName, this.ResolveName(m)));
 		}
 
 		protected virtual void OnBeforeThrownAt(Mobile m, TEntity target)
@@ -378,7 +391,7 @@ namespace VitaNex.Items
 							ClearProperties();
 							Delta(ItemDelta.Properties);
 
-							DateTime readyWhen = ThrownLast + ThrowRecovery;
+							var readyWhen = ThrownLast + ThrowRecovery;
 
 							if (DateTime.UtcNow < readyWhen)
 							{
@@ -474,7 +487,7 @@ namespace VitaNex.Items
 			base.OnSingleClick(from);
 
 			DateTime now = DateTime.UtcNow, readyWhen = ThrownLast + ThrowRecovery;
-			TimeSpan diff = TimeSpan.Zero;
+			var diff = TimeSpan.Zero;
 
 			if (readyWhen > now)
 			{
@@ -483,7 +496,7 @@ namespace VitaNex.Items
 
 			if (diff > TimeSpan.Zero)
 			{
-				string time = String.Format("{0:D2}:{1:D2}:{2:D2}", diff.Hours, diff.Minutes, diff.Seconds);
+				var time = String.Format("{0:D2}:{1:D2}:{2:D2}", diff.Hours, diff.Minutes, diff.Seconds);
 				LabelTo(from, "Use: {0}", time);
 			}
 			else if (!String.IsNullOrWhiteSpace(Usage))
@@ -501,7 +514,7 @@ namespace VitaNex.Items
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(2);
+			var version = writer.SetVersion(2);
 
 			switch (version)
 			{
@@ -513,46 +526,46 @@ namespace VitaNex.Items
 					writer.Write(Silent);
 					goto case 0;
 				case 0:
+				{
+					writer.Write(Usage);
+					writer.Write(Token);
+					writer.Write(AllowCombat);
+					writer.Write(AllowDeadUser);
+					writer.Write(Consumable);
+					writer.Write(ClearHands);
+					writer.Write(DismountUser);
+					writer.Write(EffectID);
+					writer.Write(EffectHue);
+					writer.Write(EffectSpeed);
+
+					if (version < 2)
 					{
-						writer.Write(Usage);
-						writer.Write(Token);
-						writer.Write(AllowCombat);
-						writer.Write(AllowDeadUser);
-						writer.Write(Consumable);
-						writer.Write(ClearHands);
-						writer.Write(DismountUser);
-						writer.Write(EffectID);
-						writer.Write(EffectHue);
-						writer.Write(EffectSpeed);
-
-						if (version < 2)
-						{
-							writer.Write((short)EffectRender);
-							writer.Write((byte)TargetFlags);
-						}
-						else
-						{
-							writer.WriteFlag(EffectRender);
-							writer.WriteFlag(TargetFlags);
-						}
-
-						writer.Write(ThrowSound);
-						writer.Write(ImpactSound);
-						writer.Write(ThrowRange);
-						writer.Write(ThrowRecovery);
-						writer.Write(ThrownLast);
-
-						if (version < 2)
-						{
-							writer.Write((short)RequiredSkill);
-						}
-						else
-						{
-							writer.WriteFlag(RequiredSkill);
-						}
-
-						writer.Write(RequiredSkillValue);
+						writer.Write((short)EffectRender);
+						writer.Write((byte)TargetFlags);
 					}
+					else
+					{
+						writer.WriteFlag(EffectRender);
+						writer.WriteFlag(TargetFlags);
+					}
+
+					writer.Write(ThrowSound);
+					writer.Write(ImpactSound);
+					writer.Write(ThrowRange);
+					writer.Write(ThrowRecovery);
+					writer.Write(ThrownLast);
+
+					if (version < 2)
+					{
+						writer.Write((short)RequiredSkill);
+					}
+					else
+					{
+						writer.WriteFlag(RequiredSkill);
+					}
+
+					writer.Write(RequiredSkillValue);
+				}
 					break;
 			}
 		}
@@ -561,7 +574,7 @@ namespace VitaNex.Items
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
@@ -573,46 +586,46 @@ namespace VitaNex.Items
 					Silent = reader.ReadBool();
 					goto case 0;
 				case 0:
+				{
+					Usage = reader.ReadString();
+					Token = reader.ReadString();
+					AllowCombat = reader.ReadBool();
+					AllowDeadUser = reader.ReadBool();
+					Consumable = reader.ReadBool();
+					ClearHands = reader.ReadBool();
+					DismountUser = reader.ReadBool();
+					EffectID = reader.ReadInt();
+					EffectHue = reader.ReadInt();
+					EffectSpeed = reader.ReadInt();
+
+					if (version < 2)
 					{
-						Usage = reader.ReadString();
-						Token = reader.ReadString();
-						AllowCombat = reader.ReadBool();
-						AllowDeadUser = reader.ReadBool();
-						Consumable = reader.ReadBool();
-						ClearHands = reader.ReadBool();
-						DismountUser = reader.ReadBool();
-						EffectID = reader.ReadInt();
-						EffectHue = reader.ReadInt();
-						EffectSpeed = reader.ReadInt();
-
-						if (version < 2)
-						{
-							EffectRender = (EffectRender)reader.ReadShort();
-							TargetFlags = (TargetFlags)reader.ReadByte();
-						}
-						else
-						{
-							EffectRender = reader.ReadFlag<EffectRender>();
-							TargetFlags = reader.ReadFlag<TargetFlags>();
-						}
-
-						ThrowSound = reader.ReadInt();
-						ImpactSound = reader.ReadInt();
-						ThrowRange = reader.ReadInt();
-						ThrowRecovery = reader.ReadTimeSpan();
-						ThrownLast = reader.ReadDateTime();
-
-						if (version < 2)
-						{
-							RequiredSkill = (SkillName)reader.ReadShort();
-						}
-						else
-						{
-							RequiredSkill = reader.ReadFlag<SkillName>();
-						}
-
-						RequiredSkillValue = reader.ReadDouble();
+						EffectRender = (EffectRender)reader.ReadShort();
+						TargetFlags = (TargetFlags)reader.ReadByte();
 					}
+					else
+					{
+						EffectRender = reader.ReadFlag<EffectRender>();
+						TargetFlags = reader.ReadFlag<TargetFlags>();
+					}
+
+					ThrowSound = reader.ReadInt();
+					ImpactSound = reader.ReadInt();
+					ThrowRange = reader.ReadInt();
+					ThrowRecovery = reader.ReadTimeSpan();
+					ThrownLast = reader.ReadDateTime();
+
+					if (version < 2)
+					{
+						RequiredSkill = (SkillName)reader.ReadShort();
+					}
+					else
+					{
+						RequiredSkill = reader.ReadFlag<SkillName>();
+					}
+
+					RequiredSkillValue = reader.ReadDouble();
+				}
 					break;
 			}
 		}

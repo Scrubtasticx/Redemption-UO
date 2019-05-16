@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -19,8 +19,6 @@ using VitaNex.SuperCrafts;
 
 namespace VitaNex.Items
 {
-	[Flipable(39213, 39214)]
-	[ArtworkSupport("7.0.26.0", new[] {39213, 39214}, 8792)]
 	public class PyrotechnicsKit : BaseTool
 	{
 		public override CraftSystem CraftSystem { get { return SuperCraftSystem.Resolve<Pyrotechnics>(); } }

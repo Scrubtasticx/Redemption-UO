@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -22,6 +22,8 @@ namespace VitaNex.Modules.Toolbar
 {
 	public class ToolbarState : Grid<ToolbarEntry>
 	{
+		public static ToolbarState NewEmpty { get { return new ToolbarState(); } }
+
 		private SuperGump _ToolbarGump;
 
 		[CommandProperty(Toolbars.Access)]
@@ -39,14 +41,38 @@ namespace VitaNex.Modules.Toolbar
 		[CommandProperty(Toolbars.Access)]
 		public ToolbarTheme Theme { get; set; }
 
-		public ToolbarState(
-			PlayerMobile user, int x = 0, int y = 28, int cols = 0, int rows = 0, ToolbarTheme theme = ToolbarTheme.Default)
-			: base(cols < 1 ? Toolbars.CMOptions.DefaultWidth : cols, rows < 1 ? Toolbars.CMOptions.DefaultHeight : rows)
+		private ToolbarState()
+			: this(
+				null,
+				Toolbars.CMOptions.DefaultX,
+				Toolbars.CMOptions.DefaultY,
+				Toolbars.CMOptions.DefaultWidth,
+				Toolbars.CMOptions.DefaultHeight,
+				Toolbars.CMOptions.DefaultTheme)
+		{ }
+
+		public ToolbarState(PlayerMobile user)
+			: this(
+				user,
+				Toolbars.CMOptions.DefaultX,
+				Toolbars.CMOptions.DefaultY,
+				Toolbars.CMOptions.DefaultWidth,
+				Toolbars.CMOptions.DefaultHeight,
+				Toolbars.CMOptions.DefaultTheme)
+		{ }
+
+		public ToolbarState(PlayerMobile user, int x, int y, int cols, int rows, ToolbarTheme theme)
+			: base(cols, rows)
 		{
 			User = user;
 			X = x;
 			Y = y;
 			Theme = theme;
+
+			if (User != null)
+			{
+				SetDefaultEntries();
+			}
 		}
 
 		public ToolbarState(GenericReader reader)
@@ -73,9 +99,28 @@ namespace VitaNex.Modules.Toolbar
 			return _ToolbarGump == null || _ToolbarGump.IsDisposed ? (_ToolbarGump = new ToolbarGump(this)) : _ToolbarGump;
 		}
 
+		public void SetDefaults()
+		{
+			SetDefaultPosition();
+			SetDefaultSize();
+			SetDefaultTheme();
+			SetDefaultEntries();
+		}
+
+		public virtual void SetDefaultPosition()
+		{
+			X = Toolbars.CMOptions.DefaultX;
+			Y = Toolbars.CMOptions.DefaultY;
+		}
+
 		public virtual void SetDefaultSize()
 		{
 			Resize(Toolbars.CMOptions.DefaultWidth, Toolbars.CMOptions.DefaultHeight);
+		}
+
+		public virtual void SetDefaultTheme()
+		{
+			Theme = Toolbars.CMOptions.DefaultTheme;
 		}
 
 		public virtual void SetDefaultEntries()
@@ -88,11 +133,11 @@ namespace VitaNex.Modules.Toolbar
 				return;
 			}
 
-			for (int x = 0; x < Toolbars.DefaultEntries.Width; x++)
+			for (var x = 0; x < Toolbars.DefaultEntries.Width; x++)
 			{
-				for (int y = 0; y < Toolbars.DefaultEntries.Height; y++)
+				for (var y = 0; y < Toolbars.DefaultEntries.Height; y++)
 				{
-					ToolbarEntry entry = Toolbars.DefaultEntries[x, y];
+					var entry = Toolbars.DefaultEntries[x, y];
 
 					if (entry != null && entry.ValidateState(this))
 					{
@@ -106,27 +151,27 @@ namespace VitaNex.Modules.Toolbar
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
 				case 0:
+				{
+					if (this == Toolbars.DefaultEntries)
 					{
-						if (this == Toolbars.DefaultEntries)
-						{
-							writer.Write(false);
-						}
-						else
-						{
-							writer.Write(true);
-							writer.Write(User);
-						}
-
-						writer.Write(Minimized);
-						writer.Write(X);
-						writer.Write(Y);
-						writer.WriteFlag(Theme);
+						writer.Write(false);
 					}
+					else
+					{
+						writer.Write(true);
+						writer.Write(User);
+					}
+
+					writer.Write(Minimized);
+					writer.Write(X);
+					writer.Write(Y);
+					writer.WriteFlag(Theme);
+				}
 					break;
 			}
 		}
@@ -135,22 +180,22 @@ namespace VitaNex.Modules.Toolbar
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
 				case 0:
+				{
+					if (reader.ReadBool())
 					{
-						if (reader.ReadBool())
-						{
-							User = reader.ReadMobile<PlayerMobile>();
-						}
-
-						Minimized = reader.ReadBool();
-						X = reader.ReadInt();
-						Y = reader.ReadInt();
-						Theme = reader.ReadFlag<ToolbarTheme>();
+						User = reader.ReadMobile<PlayerMobile>();
 					}
+
+					Minimized = reader.ReadBool();
+					X = reader.ReadInt();
+					Y = reader.ReadInt();
+					Theme = reader.ReadFlag<ToolbarTheme>();
+				}
 					break;
 			}
 		}

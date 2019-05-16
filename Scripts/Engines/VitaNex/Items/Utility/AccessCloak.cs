@@ -3,13 +3,14 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
 #endregion
 
 #region References
+using System;
 using System.Drawing;
 
 using Server;
@@ -91,6 +92,10 @@ namespace VitaNex.Items
 
 			BlessedFor.AccessLevel = _AccessMask;
 
+			BlessedFor.Hits = BlessedFor.HitsMax;
+			BlessedFor.Stam = BlessedFor.StamMax;
+			BlessedFor.Mana = BlessedFor.ManaMax;
+
 			return base.OnEquip(from);
 		}
 
@@ -103,6 +108,10 @@ namespace VitaNex.Items
 			if (BlessedFor != null)
 			{
 				BlessedFor.AccessLevel = _AccessTemp;
+
+				BlessedFor.Hits = BlessedFor.HitsMax;
+				BlessedFor.Stam = BlessedFor.StamMax;
+				BlessedFor.Mana = BlessedFor.ManaMax;
 			}
 
 			base.OnRemoved(parent);
@@ -113,6 +122,10 @@ namespace VitaNex.Items
 			if (BlessedFor != null)
 			{
 				BlessedFor.AccessLevel = _AccessTemp;
+
+				BlessedFor.Hits = BlessedFor.HitsMax;
+				BlessedFor.Stam = BlessedFor.StamMax;
+				BlessedFor.Mana = BlessedFor.ManaMax;
 			}
 
 			base.OnDelete();
@@ -123,23 +136,26 @@ namespace VitaNex.Items
 			base.AddNameProperty(list);
 
 			list.Add(
-				"<basefont color=#{0:X6}>Cloak: {1} => {2}<basefont color=#FFFFFF>", Color.Gold.ToArgb(), _AccessTemp, _AccessMask);
+				"<basefont color=#{0:X6}>Cloak: {1} => {2}<basefont color=#FFFFFF>",
+				Color.Gold.ToRgb(),
+				_AccessTemp,
+				_AccessMask);
 		}
 
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			int version = writer.SetVersion(0);
+			var version = writer.SetVersion(0);
 
 			switch (version)
 			{
 				case 0:
-					{
-						writer.Write(BlessedFor);
-						writer.WriteFlag(_AccessMask);
-						writer.WriteFlag(_AccessTemp);
-					}
+				{
+					writer.Write(BlessedFor);
+					writer.WriteFlag(_AccessMask);
+					writer.WriteFlag(_AccessTemp);
+				}
 					break;
 			}
 		}
@@ -148,16 +164,17 @@ namespace VitaNex.Items
 		{
 			base.Deserialize(reader);
 
-			int version = reader.GetVersion();
+			var version = reader.GetVersion();
 
 			switch (version)
 			{
 				case 0:
-					{
-						BlessedFor = reader.ReadMobile();
-						_AccessMask = reader.ReadFlag<AccessLevel>();
-						_AccessTemp = reader.ReadFlag<AccessLevel>();
-					}
+				{
+					BlessedFor = reader.ReadMobile();
+
+					_AccessMask = reader.ReadFlag<AccessLevel>();
+					_AccessTemp = reader.ReadFlag<AccessLevel>();
+				}
 					break;
 			}
 		}

@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -14,12 +14,14 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Threading.Tasks;
 
 using Server;
 using Server.Gumps;
-using Server.Mobiles;
 using Server.Network;
+
+using Ultima;
+
+using VitaNex.Collections;
 #endregion
 
 namespace VitaNex.SuperGumps
@@ -34,19 +36,18 @@ namespace VitaNex.SuperGumps
 		public static int DefaultHighlightHue = 51;
 
 		public static TimeSpan DefaultRefreshRate = TimeSpan.FromSeconds(30);
-		public static Color DefaultHtmlColor = Color.Gold;
+		public static Color DefaultHtmlColor = Color.PaleGoldenrod;
 
-		public static TimeSpan PollInterval = TimeSpan.FromMilliseconds(10.0);
-
+		public static TimeSpan PollInterval = TimeSpan.FromMilliseconds(100.0);
 		public static TimeSpan DClickInterval = TimeSpan.FromMilliseconds(1000.0);
 
-		private static void InternalClose(SuperGump g)
-		{
-			if (g != null)
-			{
-				VitaNexCore.TryCatch(() => InternalClose(g.User, g));
-			}
-		}
+		public event Action<SuperGump, bool> OnActionSend;
+		public event Action<SuperGump, bool> OnActionClose;
+		public event Action<SuperGump, bool> OnActionHide;
+		public event Action<SuperGump> OnActionRefresh;
+		public event Action<SuperGump> OnActionDispose;
+		public event Action<SuperGump> OnActionClick;
+		public event Action<SuperGump> OnActionDoubleClick;
 
 		private static void InternalClose(Mobile m, Gump g)
 		{
@@ -55,18 +56,93 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			g.OnServerClose(m.NetState);
+			var ns = m.NetState;
 
-			if (m.NetState == null)
+			try
+			{
+				g.OnServerClose(ns);
+			}
+			catch
+			{ }
+
+			if (ns == null)
 			{
 				return;
 			}
 
 			m.Send(new CloseGump(g.TypeID, 0));
-			m.NetState.RemoveGump(g);
+			ns.RemoveGump(g);
 		}
 
-		public static TGump Send<TGump>(TGump gump) where TGump : SuperGump
+		private static void InternalClose(SuperGump g)
+		{
+			if (g != null)
+			{
+				InternalClose(g.User, g);
+			}
+		}
+
+		private static void InternalCloseDupes(SuperGump g)
+		{
+			if (g == null || g.IsDisposed || g.User == null || g.AllowMultiple)
+			{
+				return;
+			}
+
+			var gumps = Instances.GetValue(g.User);
+
+			if (gumps == null)
+			{
+				return;
+			}
+
+			var t = g.GetType();
+			var i = gumps.Count;
+
+			while (--i >= 0)
+			{
+				if (gumps[i] != g && gumps[i].TypeEquals(t, false))
+				{
+					InternalClose(gumps[i]);
+				}
+			}
+		}
+
+		private static void InternalSend(SuperGump g)
+		{
+			if (g == null || g.IsDisposed || g.Modal || g.User == null)
+			{
+				return;
+			}
+
+			var gumps = Instances.GetValue(g.User);
+
+			if (gumps == null)
+			{
+				return;
+			}
+
+			var i = gumps.Count;
+			var j = gumps.IndexOf(g);
+
+			while (--i >= 0)
+			{
+				if ((i >= j && j >= 0) || !gumps.InBounds(i))
+				{
+					continue;
+				}
+
+				var o = gumps[i];
+
+				if (o != g && o.Modal && o.IsOpen && !o.IsDisposed)
+				{
+					gumps[i].Refresh();
+				}
+			}
+		}
+
+		public static TGump Send<TGump>(TGump gump)
+			where TGump : SuperGump
 		{
 			return gump != null ? (gump.Compiled ? gump.Refresh() : gump.Send()) as TGump : null;
 		}
@@ -76,8 +152,8 @@ namespace VitaNex.SuperGumps
 		private DateTime _UtcNow = DateTime.UtcNow;
 
 		protected int NextButtonID = 1;
-		protected int NextSwitchID = 0;
-		protected int NextTextInputID = 0;
+		protected int NextSwitchID;
+		protected int NextTextInputID;
 
 		private bool _Modal;
 		private bool _EnablePolling;
@@ -101,11 +177,13 @@ namespace VitaNex.SuperGumps
 				{
 					_EnablePolling = false;
 
-					if (InstancePoller != null)
+					if (InstancePoller == null)
 					{
-						InstancePoller.Dispose();
-						InstancePoller = null;
+						return;
 					}
+
+					InstancePoller.Dispose();
+					InstancePoller = null;
 				}
 				else if (!_EnablePolling && value)
 				{
@@ -113,7 +191,7 @@ namespace VitaNex.SuperGumps
 
 					InitPollTimer();
 				}
-				else
+				else if (value)
 				{
 					InitPollTimer();
 				}
@@ -125,7 +203,7 @@ namespace VitaNex.SuperGumps
 			get { return _Parent; }
 			set
 			{
-				if (_Parent == value)
+				if (_Parent == value || value == this)
 				{
 					return;
 				}
@@ -144,8 +222,7 @@ namespace VitaNex.SuperGumps
 			}
 		}
 
-		public virtual SuperGumpLayout Layout { get; set; }
-		public virtual PlayerMobile User { get; set; }
+		public virtual Mobile User { get; set; }
 
 		public virtual bool Modal
 		{
@@ -168,6 +245,8 @@ namespace VitaNex.SuperGumps
 			}
 		}
 
+		public virtual bool AllowMultiple { get; set; }
+
 		public virtual bool ModalSafety { get; set; }
 
 		public virtual bool BlockSpeech { get; set; }
@@ -178,6 +257,8 @@ namespace VitaNex.SuperGumps
 		public virtual int TextHue { get; set; }
 		public virtual int ErrorHue { get; set; }
 		public virtual int HighlightHue { get; set; }
+
+		public virtual Direction Direction { get; set; }
 
 		public virtual TimeSpan AutoRefreshRate { get; set; }
 		public virtual DateTime LastAutoRefresh { get; set; }
@@ -216,33 +297,24 @@ namespace VitaNex.SuperGumps
 		public virtual bool RandomTextEntryID { get; set; }
 		public virtual bool RandomSwitchID { get; set; }
 
-		public int IndexedPage
+		public int IndexedPage { get { return GetEntries<GumpPage>().Aggregate(-1, (max, p) => Math.Max(max, p.Page)); } }
+
+		public bool IsEnhancedClient { get { return User != null && User.NetState != null && User.NetState.IsEnhanced(); } }
+
+		public bool SupportsUltimaStore
 		{
-			get
-			{
-				var list = GetEntries<GumpPage>().Select(e => e.Page).ToList();
-
-				int idx = list.Count > 0 ? list.Max() : -1;
-
-				list.Clear();
-				list.TrimExcess();
-
-				return idx;
-			}
+			get { return User != null && User.NetState != null && User.NetState.SupportsUltimaStore(); }
 		}
 
-		public SuperGump(PlayerMobile user, Gump parent = null, int? x = null, int? y = null)
+		public bool SupportsEndlessJourney
+		{
+			get { return User != null && User.NetState != null && User.NetState.SupportsEndlessJourney(); }
+		}
+
+		public SuperGump(Mobile user, Gump parent = null, int? x = null, int? y = null)
 			: base(x ?? DefaultX, y ?? DefaultY)
 		{
-			Linked = new List<SuperGump>();
-			Children = new List<SuperGump>();
-
-			Buttons = new Dictionary<GumpButton, Action<GumpButton>>();
-			TileButtons = new Dictionary<GumpImageTileButton, Action<GumpImageTileButton>>();
-			Switches = new Dictionary<GumpCheck, Action<GumpCheck, bool>>();
-			Radios = new Dictionary<GumpRadio, Action<GumpRadio, bool>>();
-			TextInputs = new Dictionary<GumpTextEntry, Action<GumpTextEntry, string>>();
-			LimitedTextInputs = new Dictionary<GumpTextEntryLimited, Action<GumpTextEntryLimited, string>>();
+			AssignCollections();
 
 			TextHue = DefaultTextHue;
 			ErrorHue = DefaultErrorHue;
@@ -250,14 +322,21 @@ namespace VitaNex.SuperGumps
 
 			User = user;
 			Parent = parent;
+
 			Modal = false;
 			ModalSafety = true;
 			BlockSpeech = false;
 			BlockMovement = false;
+			UseSounds = true;
 
 			AutoRefresh = false;
 			LastAutoRefresh = DateTime.UtcNow;
 			AutoRefreshRate = DefaultRefreshRate;
+
+			AnimationRate = DefaultAnimationRate;
+
+			InitSounds();
+			InitAssets();
 
 			RegisterInstance();
 
@@ -266,9 +345,65 @@ namespace VitaNex.SuperGumps
 
 		~SuperGump()
 		{
-			//Console.WriteLine("~{0}: 0x{1:X}", GetType().Name, Serial);
-
 			Dispose();
+		}
+
+		public virtual void AssignCollections()
+		{
+			if (Entries.Capacity < 0x40)
+			{
+				Entries.Capacity = 0x40;
+			}
+
+			if (_Linked == null)
+			{
+				ObjectPool.Acquire(out _Linked);
+			}
+
+			if (_Children == null)
+			{
+				ObjectPool.Acquire(out _Children);
+			}
+
+			if (_Controls == null)
+			{
+				ObjectPool.Acquire(out _Controls);
+			}
+
+			if (_Layout == null)
+			{
+				ObjectPool.Acquire(out _Layout);
+			}
+
+			if (_Buttons == null)
+			{
+				ObjectPool.Acquire(out _Buttons);
+			}
+
+			if (_TileButtons == null)
+			{
+				ObjectPool.Acquire(out _TileButtons);
+			}
+
+			if (_Switches == null)
+			{
+				ObjectPool.Acquire(out _Switches);
+			}
+
+			if (_Radios == null)
+			{
+				ObjectPool.Acquire(out _Radios);
+			}
+
+			if (_TextInputs == null)
+			{
+				ObjectPool.Acquire(out _TextInputs);
+			}
+
+			if (_LimitedTextInputs == null)
+			{
+				ObjectPool.Acquire(out _LimitedTextInputs);
+			}
 		}
 
 		public void InitPollTimer()
@@ -285,56 +420,19 @@ namespace VitaNex.SuperGumps
 			}
 		}
 
-		protected int NewButtonID()
+		public int NewButtonID()
 		{
 			return RandomButtonID ? (NextButtonID += Utility.Random(Utility.Dice(6, 6, 6)) + 1) : NextButtonID++;
 		}
 
-		protected int NewTextEntryID()
+		public int NewTextEntryID()
 		{
 			return RandomTextEntryID ? (NextTextInputID += Utility.Random(Utility.Dice(6, 6, 6)) + 1) : NextTextInputID++;
 		}
 
-		protected int NewSwitchID()
+		public int NewSwitchID()
 		{
 			return RandomSwitchID ? (NextSwitchID += Utility.Random(Utility.Dice(6, 6, 6)) + 1) : NextSwitchID++;
-		}
-
-		public void AddPage()
-		{
-			AddPage(IndexedPage + 1);
-		}
-
-		public void AddPageBackButton(int x, int y, int normalID, int pressedID)
-		{
-			AddPageBackButton(x, y, normalID, pressedID, IndexedPage);
-		}
-
-		public void AddPageNextButton(int x, int y, int normalID, int pressedID)
-		{
-			AddPageNextButton(x, y, normalID, pressedID, IndexedPage);
-		}
-
-		public void AddPageButton(int x, int y, int normalID, int pressedID)
-		{
-			AddPageButton(x, y, normalID, pressedID, IndexedPage);
-		}
-
-		public void AddPageBackButton(int x, int y, int normalID, int pressedID, int page)
-		{
-			AddPageButton(x, y, normalID, pressedID, page - 1);
-			AddTooltip(1011067); // Previous Page
-		}
-
-		public void AddPageNextButton(int x, int y, int normalID, int pressedID, int page)
-		{
-			AddPageButton(x, y, normalID, pressedID, page + 1);
-			AddTooltip(1011066); // Next Page
-		}
-
-		public void AddPageButton(int x, int y, int normalID, int pressedID, int page)
-		{
-			AddButton(x, y, normalID, pressedID, -1, GumpButtonType.Page, page);
 		}
 
 		protected virtual void Compile()
@@ -386,27 +484,35 @@ namespace VitaNex.SuperGumps
 
 			if (Modal)
 			{
-				layout.Add(
-					"alpharegion/modal",
-					() =>
-					{
-						for (int a = 0; a < 2; a++)
-						{
-							for (int b = 0; b < 2; b++)
-							{
-								AddImageTiled(a * 1024, b * 786, 1024, 786, 2624);
-								AddAlphaRegion(a * 1024, b * 786, 1024, 786);
-							}
-						}
-					});
+				layout.Add("alpharegion/modal", () => AddModalRegion(0, 0, 2560, 1440));
 			}
 		}
 
-		protected virtual void OnClick()
+		protected virtual void OnLayoutApplied()
 		{ }
 
+		protected virtual void OnClick()
+		{
+			if (!DoubleClicked)
+			{
+				PlayClickSound();
+			}
+
+			if (OnActionClick != null)
+			{
+				OnActionClick(this);
+			}
+		}
+
 		protected virtual void OnDoubleClick()
-		{ }
+		{
+			PlayDoubleClickSound();
+
+			if (OnActionDoubleClick != null)
+			{
+				OnActionDoubleClick(this);
+			}
+		}
 
 		protected virtual void OnInstancePollCheck()
 		{
@@ -431,12 +537,34 @@ namespace VitaNex.SuperGumps
 			}
 
 			LastAutoRefresh = _UtcNow;
-			Refresh();
+
+			Refresh(true);
 		}
 
 		protected virtual bool CanAutoRefresh()
 		{
-			return !IsDisposed && IsOpen && AutoRefresh && !HasChildren && (_UtcNow - LastAutoRefresh) >= AutoRefreshRate;
+			if (IsDisposed || !IsOpen || Hidden)
+			{
+				return false;
+			}
+
+			if (!AutoRefresh || LastAutoRefresh + AutoRefreshRate > _UtcNow)
+			{
+				return false;
+			}
+
+			if (Modal && HasOpenChildren)
+			{
+				return false;
+			}
+
+			if (!Modal && EnumerateInstances<SuperGump>(User, true)
+					.Any(o => o != this && o.IsOpen && !o.Hidden && (o.Modal || o.IsChildOf(this))))
+			{
+				return false;
+			}
+
+			return true;
 		}
 
 		protected virtual void OnRefreshed()
@@ -459,15 +587,22 @@ namespace VitaNex.SuperGumps
 			{
 				InitPollTimer();
 			}
-			else if (!InstancePoller.Running)
+			else
 			{
 				InstancePoller.Running = EnablePolling;
 			}
 
-			Linked.AsEnumerable().ForEach(g => g.OnLinkRefreshed(this));
+			Linked.ForEachReverse(g => g.OnLinkRefreshed(this));
+
+			PlayRefreshSound();
+
+			if (OnActionRefresh != null)
+			{
+				OnActionRefresh(this);
+			}
 		}
 
-		protected virtual void Refresh(GumpButton b)
+		public virtual void Refresh(GumpButton b)
 		{
 			if (!IsDisposed)
 			{
@@ -475,7 +610,7 @@ namespace VitaNex.SuperGumps
 			}
 		}
 
-		protected virtual void Refresh(GumpImageTileButton b)
+		public virtual void Refresh(GumpImageTileButton b)
 		{
 			if (!IsDisposed)
 			{
@@ -483,9 +618,19 @@ namespace VitaNex.SuperGumps
 			}
 		}
 
-		public virtual SuperGump Refresh(bool recompile = false)
+		public SuperGump Refresh()
+		{
+			return Refresh(false);
+		}
+
+		public virtual SuperGump Refresh(bool recompile)
 		{
 			if (IsDisposed)
+			{
+				return this;
+			}
+
+			if (User == null || !User.IsOnline())
 			{
 				return this;
 			}
@@ -502,22 +647,26 @@ namespace VitaNex.SuperGumps
 
 			if (Modal && ModalSafety && Buttons.Count == 0 && TileButtons.Count == 0)
 			{
-				CanDispose = true;
 				CanClose = true;
+				CanDispose = true;
 			}
 
 			IsOpen = User.SendGump(this, false);
+
 			Hidden = false;
+
 			OnRefreshed();
+
 			return this;
 		}
 
-		public T Send<T>() where T : SuperGump
+		public T Send<T>()
+			where T : SuperGump
 		{
 			return Send() as T;
 		}
 
-		private bool _Sending;
+		private volatile bool _Sending;
 
 		public virtual SuperGump Send()
 		{
@@ -526,69 +675,123 @@ namespace VitaNex.SuperGumps
 				return this;
 			}
 
+			if (User == null || !User.IsOnline())
+			{
+				return this;
+			}
+
 			_Sending = true;
 
 			return VitaNexCore.TryCatchGet(
-				() =>
-				{
-					if (IsOpen)
-					{
-						InternalClose(this);
-					}
+					   () =>
+					   {
+						   if (IsOpen)
+						   {
+							   InternalClose(this);
+						   }
 
-					Compile();
-					Clear();
+						   Compile();
 
-					AddPage();
+						   Clear();
 
-					CompileLayout(Layout);
-					Layout.ApplyTo(this);
+						   AddPage();
 
-					InvalidateOffsets();
-					InvalidateSize();
+						   CompileLayout(Layout);
 
-					Compiled = true;
+						   Layout.ApplyTo(this);
 
-					if (Modal && ModalSafety && Buttons.Count == 0 && TileButtons.Count == 0)
-					{
-						CanDispose = true;
-						CanClose = true;
-					}
+						   OnLayoutApplied();
 
-					OnBeforeSend();
+						   InvalidateAnimations();
+						   InvalidateOffsets();
+						   InvalidateSize();
 
-					Initialized = true;
-					IsOpen = User.SendGump(this, false);
-					Hidden = false;
+						   Compiled = true;
 
-					if (IsOpen)
-					{
-						OnSend();
-					}
-					else
-					{
-						OnSendFail();
-					}
+						   if (!CanDispose && CanClose)
+						   {
+							   CanClose = false;
+						   }
 
-					_Sending = false;
+						   var wasHolding = false;
 
-					return this;
-				},
-				e =>
-				{
-					Console.WriteLine("SuperGump '{0}' could not be sent, an exception was caught:", GetType().FullName);
-					VitaNexCore.ToConsole(e);
-					IsOpen = false;
-					Hidden = false;
-					OnSendFail();
+						   if (Modal)
+						   {
+							   if (ModalSafety && Buttons.Count == 0 && TileButtons.Count == 0)
+							   {
+								   CanDispose = true;
+								   CanClose = true;
+							   }
 
-					_Sending = false;
-				}) ?? this;
+							   if (User != null && User.Holding != null)
+							   {
+								   var held = User.Holding;
+
+								   if (held.GetBounce() != null)
+								   {
+									   held.Bounce(User);
+								   }
+								   else
+								   {
+									   User.GiveItem(held, GiveFlags.PackFeet, false);
+									   User.Holding = null;
+									   held.ClearBounce();
+								   }
+
+								   wasHolding = held != null;
+							   }
+						   }
+
+						   if (OnBeforeSend())
+						   {
+							   InternalCloseDupes(this);
+
+							   Initialized = true;
+							   IsOpen = User.SendGump(this, false);
+							   Hidden = !IsOpen;
+
+							   if (IsOpen)
+							   {
+								   OnSend();
+
+								   InternalSend(this);
+							   }
+							   else
+							   {
+								   OnSendFail();
+							   }
+						   }
+						   else
+						   {
+							   Close();
+						   }
+
+						   _Sending = false;
+
+						   if (wasHolding)
+						   {
+							   Timer.DelayCall(TimeSpan.FromSeconds(0.5), () => Refresh(true));
+						   }
+
+						   return this;
+					   },
+					   e =>
+					   {
+						   _Sending = false;
+
+						   Console.WriteLine("SuperGump '{0}' could not be sent, an exception was caught:", GetType().FullName);
+
+						   e.ToConsole();
+
+						   IsOpen = Hidden = false;
+
+						   OnSendFail();
+					   }) ?? this;
 		}
 
-		protected virtual void OnBeforeSend()
+		protected virtual bool OnBeforeSend()
 		{
-			VitaNexCore.TryCatch(() => EnumerateInstances(User, GetType()).Where(g => g != this).ForEach(InternalClose));
+			return !IsDisposed && User != null && User.IsOnline();
 		}
 
 		protected virtual void OnSend()
@@ -605,24 +808,24 @@ namespace VitaNex.SuperGumps
 			if (Parent is SuperGump)
 			{
 				((SuperGump)Parent).AddChild(this);
-				Children.TrimExcess();
 			}
 
 			if (InstancePoller == null)
 			{
 				InitPollTimer();
 			}
-			else if (!InstancePoller.Running)
+			else
 			{
 				InstancePoller.Running = EnablePolling;
 			}
 
-			Linked.AsEnumerable().ForEach(g => g.OnLinkSend(this));
-			Linked.TrimExcess();
+			Linked.ForEachReverse(g => g.OnLinkSend(this));
 
-			if (Modal && User != null && User.Holding != null)
+			PlaySendSound();
+
+			if (OnActionSend != null)
 			{
-				Timer.DelayCall(TimeSpan.FromSeconds(1.0), User.DropHolding);
+				OnActionSend(this, true);
 			}
 		}
 
@@ -638,7 +841,6 @@ namespace VitaNex.SuperGumps
 			if (Parent is SuperGump)
 			{
 				((SuperGump)Parent).RemoveChild(this);
-				Children.TrimExcess();
 			}
 
 			if (InstancePoller != null)
@@ -647,8 +849,12 @@ namespace VitaNex.SuperGumps
 				InstancePoller = null;
 			}
 
-			Linked.AsEnumerable().ForEach(g => g.OnLinkSendFail(this));
-			Linked.TrimExcess();
+			Linked.ForEachReverse(g => g.OnLinkSendFail(this));
+
+			if (OnActionSend != null)
+			{
+				OnActionSend(this, false);
+			}
 		}
 
 		protected virtual void OnHidden(bool all)
@@ -658,27 +864,38 @@ namespace VitaNex.SuperGumps
 				return;
 			}
 
-			Linked.AsEnumerable().ForEach(g => g.OnLinkHidden(this));
-			Linked.TrimExcess();
-		}
+			Linked.ForEachReverse(g => g.OnLinkHidden(this));
 
-		protected virtual void Hide(GumpButton b)
-		{
-			if (!IsDisposed)
+			PlayHideSound();
+
+			if (OnActionHide != null)
 			{
-				Hide();
+				OnActionHide(this, all);
 			}
 		}
 
-		protected virtual void Hide(GumpImageTileButton b)
+		public virtual void Hide(GumpButton b)
 		{
 			if (!IsDisposed)
 			{
-				Hide();
+				Hide(false);
 			}
 		}
 
-		public virtual SuperGump Hide(bool all = false)
+		public virtual void Hide(GumpImageTileButton b)
+		{
+			if (!IsDisposed)
+			{
+				Hide(false);
+			}
+		}
+
+		public SuperGump Hide()
+		{
+			return Hide(false);
+		}
+
+		public virtual SuperGump Hide(bool all)
 		{
 			if (IsDisposed)
 			{
@@ -692,23 +909,25 @@ namespace VitaNex.SuperGumps
 				InternalClose(this);
 			}
 
-			if (Parent != null)
+			if (Parent != null && all)
 			{
-				if (all)
+				if (Parent is SuperGump)
 				{
-					if (Parent is SuperGump)
-					{
-						((SuperGump)Parent).Hide(true);
-					}
-					else
-					{
-						InternalClose(User, Parent);
-					}
+					((SuperGump)Parent).Hide(true);
+				}
+				else
+				{
+					InternalClose(User, Parent);
 				}
 			}
 
 			OnHidden(all);
 			return this;
+		}
+
+		public void Show()
+		{
+			Refresh(true);
 		}
 
 		protected virtual void OnClosed(bool all)
@@ -726,27 +945,38 @@ namespace VitaNex.SuperGumps
 				InstancePoller = null;
 			}
 
-			Linked.AsEnumerable().ForEach(g => g.OnLinkClosed(this));
-			Linked.TrimExcess();
-		}
+			Linked.ForEachReverse(g => g.OnLinkClosed(this));
 
-		protected virtual void Close(GumpButton b)
-		{
-			if (!IsDisposed)
+			PlayCloseSound();
+
+			if (OnActionClose != null)
 			{
-				Close();
+				OnActionClose(this, all);
 			}
 		}
 
-		protected virtual void Close(GumpImageTileButton b)
+		public virtual void Close(GumpButton b)
 		{
 			if (!IsDisposed)
 			{
-				Close();
+				Close(false);
 			}
 		}
 
-		public virtual void Close(bool all = false)
+		public virtual void Close(GumpImageTileButton b)
+		{
+			if (!IsDisposed)
+			{
+				Close(false);
+			}
+		}
+
+		public void Close()
+		{
+			Close(false);
+		}
+
+		public virtual void Close(bool all)
 		{
 			if (IsDisposed)
 			{
@@ -758,8 +988,7 @@ namespace VitaNex.SuperGumps
 				InternalClose(this);
 			}
 
-			IsOpen = false;
-			Hidden = false;
+			IsOpen = Hidden = false;
 
 			if (Parent != null)
 			{
@@ -778,7 +1007,7 @@ namespace VitaNex.SuperGumps
 				{
 					if (Parent is SuperGump)
 					{
-						((SuperGump)Parent).Send();
+						((SuperGump)Parent).Refresh(true);
 					}
 					else
 					{
@@ -792,28 +1021,20 @@ namespace VitaNex.SuperGumps
 
 		protected virtual void Clear()
 		{
+			_Layout.Clear();
+
+			_Buttons.Clear();
+			_TileButtons.Clear();
+			_Switches.Clear();
+			_Radios.Clear();
+			_TextInputs.Clear();
+			_LimitedTextInputs.Clear();
+
+			Entries.Clear();
+
 			NextButtonID = 1;
 			NextSwitchID = 0;
 			NextTextInputID = 0;
-
-			Buttons.Clear();
-			TileButtons.Clear();
-			Switches.Clear();
-			Radios.Clear();
-			TextInputs.Clear();
-			LimitedTextInputs.Clear();
-
-			Entries.Clear();
-			Entries.TrimExcess();
-
-			if (Layout == null)
-			{
-				Layout = new SuperGumpLayout();
-			}
-			else
-			{
-				Layout.Clear();
-			}
 		}
 
 		protected virtual void OnSpeech(SpeechEventArgs e)
@@ -826,13 +1047,35 @@ namespace VitaNex.SuperGumps
 
 		protected virtual void OnMovement(MovementEventArgs e)
 		{
-			if (BlockMovement && !IsDisposed && IsOpen && !Hidden && !e.Blocked && User.AccessLevel < AccessLevel.Counselor)
+			if (IsDisposed || !IsOpen || Hidden)
 			{
-				e.Blocked = true;
+				return;
+			}
+
+			var d = e.Direction & Direction.Mask;
+
+			bool up, right, down, left;
+
+			GetDirections(d, out up, out right, out down, out left);
+
+			var blocked = e.Blocked;
+
+			OnMovement(ref blocked, d, up, right, down, left);
+
+			Direction = d;
+
+			e.Blocked = blocked;
+		}
+
+		protected virtual void OnMovement(ref bool blocked, Direction d, bool up, bool right, bool down, bool left)
+		{
+			if (BlockMovement)
+			{
+				blocked = true;
 			}
 		}
 
-		public override sealed void OnServerClose(NetState owner)
+		public override void OnServerClose(NetState owner)
 		{
 			if (IsDisposed)
 			{
@@ -852,73 +1095,45 @@ namespace VitaNex.SuperGumps
 			base.OnServerClose(owner);
 		}
 
-		public override sealed void OnResponse(NetState sender, RelayInfo info)
+		public override void OnResponse(NetState sender, RelayInfo info)
 		{
 			if (IsDisposed)
 			{
 				return;
 			}
 
-			if (Switches.Count > 128)
+			foreach (var o in Switches.Keys)
 			{
-				Parallel.ForEach(Switches.Keys, e => HandleSwitch(e, info.IsSwitched(e.SwitchID)));
-			}
-			else
-			{
-				Switches.Keys.ForEach(e => HandleSwitch(e, info.IsSwitched(e.SwitchID)));
+				HandleSwitch(o, info.IsSwitched(o.SwitchID));
 			}
 
-			if (Radios.Count > 128)
+			foreach (var o in Radios.Keys)
 			{
-				Parallel.ForEach(Radios.Keys, e => HandleRadio(e, info.IsSwitched(e.SwitchID)));
-			}
-			else
-			{
-				Radios.Keys.ForEach(e => HandleRadio(e, info.IsSwitched(e.SwitchID)));
+				HandleRadio(o, info.IsSwitched(o.SwitchID));
 			}
 
-			if (TextInputs.Count > 128)
+			foreach (var o in TextInputs.Keys)
 			{
-				Parallel.ForEach(
-					TextInputs.Keys,
-					e =>
-					{
-						var r = info.GetTextEntry(e.EntryID);
-						HandleTextInput(e, r != null ? r.Text : String.Empty);
-					});
-			}
-			else
-			{
-				TextInputs.Keys.ForEach(
-					e =>
-					{
-						var r = info.GetTextEntry(e.EntryID);
-						HandleTextInput(e, r != null ? r.Text : String.Empty);
-					});
+				var r = info.GetTextEntry(o.EntryID);
+
+				if (r != null)
+				{
+					HandleTextInput(o, r.Text ?? String.Empty);
+				}
 			}
 
-			if (LimitedTextInputs.Count > 128)
+			foreach (var o in LimitedTextInputs.Keys)
 			{
-				Parallel.ForEach(
-					LimitedTextInputs.Keys,
-					e =>
-					{
-						var r = info.GetTextEntry(e.EntryID);
-						HandleLimitedTextInput(e, r != null ? r.Text : String.Empty);
-					});
-			}
-			else
-			{
-				LimitedTextInputs.Keys.ForEach(
-					e =>
-					{
-						var r = info.GetTextEntry(e.EntryID);
-						HandleLimitedTextInput(e, r != null ? r.Text : String.Empty);
-					});
+				var r = info.GetTextEntry(o.EntryID);
+
+				if (r != null)
+				{
+					HandleLimitedTextInput(o, r.Text ?? String.Empty);
+				}
 			}
 
-			GumpButton button1 = GetButtonEntry(info.ButtonID);
-			GumpImageTileButton button2 = GetTileButtonEntry(info.ButtonID);
+			var button1 = GetButtonEntry(info.ButtonID);
+			var button2 = GetTileButtonEntry(info.ButtonID);
 
 			if (button1 == null && button2 == null)
 			{
@@ -942,7 +1157,122 @@ namespace VitaNex.SuperGumps
 			base.OnResponse(sender, info);
 		}
 
-		public virtual IEnumerable<T> GetEntries<T>() where T : GumpEntry
+		public virtual void GetDirections(Direction d, out bool up, out bool right, out bool down, out bool left)
+		{
+			up = right = down = left = false;
+
+			switch (Direction)
+			{
+				case Direction.Up:
+					up = true;
+					break;
+				case Direction.North:
+					up = right = true;
+					break;
+				case Direction.Right:
+					right = true;
+					break;
+				case Direction.East:
+					right = down = true;
+					break;
+				case Direction.Down:
+					down = true;
+					break;
+				case Direction.South:
+					down = left = true;
+					break;
+				case Direction.Left:
+					left = true;
+					break;
+				case Direction.West:
+					left = up = true;
+					break;
+			}
+		}
+
+		public virtual void GetOffset(bool up, bool right, bool down, bool left, ref int x, ref int y)
+		{
+			if (up)
+			{
+				--y;
+			}
+
+			if (right)
+			{
+				++x;
+			}
+
+			if (down)
+			{
+				++y;
+			}
+
+			if (left)
+			{
+				--x;
+			}
+		}
+
+		public virtual void GetOffset(Direction d, ref int x, ref int y)
+		{
+			switch (d & Direction.Mask)
+			{
+				case Direction.Up:
+					--y;
+					break;
+				case Direction.North:
+				{
+					++x;
+					--y;
+				}
+					break;
+				case Direction.Right:
+					++x;
+					break;
+				case Direction.East:
+				{
+					++x;
+					++y;
+				}
+					break;
+				case Direction.Down:
+					++y;
+					break;
+				case Direction.South:
+				{
+					--x;
+					++y;
+				}
+					break;
+				case Direction.Left:
+					--x;
+					break;
+				case Direction.West:
+				{
+					--x;
+					--y;
+				}
+					break;
+			}
+		}
+
+		public virtual Size GetImageSize(int imageID)
+		{
+			return GumpsExtUtility.GetImageSize(imageID);
+		}
+
+		public virtual Size GetItemSize(int itemID)
+		{
+			return ArtExtUtility.GetImageSize(itemID);
+		}
+
+		public virtual Point GetItemOffset(int itemID)
+		{
+			return ArtExtUtility.GetImageOffset(itemID);
+		}
+
+		public virtual IEnumerable<T> GetEntries<T>()
+			where T : GumpEntry
 		{
 			return Entries.OfType<T>();
 		}
@@ -954,12 +1284,31 @@ namespace VitaNex.SuperGumps
 
 		public override bool Equals(object other)
 		{
-			return !ReferenceEquals(other, null) && (other is SuperGump ? Equals((SuperGump)other) : base.Equals(other));
+			return Equals(other as SuperGump);
 		}
 
 		public virtual bool Equals(SuperGump other)
 		{
 			return !ReferenceEquals(other, null) && other.Serial == Serial;
+		}
+
+		private void DisposeEntry(GumpEntry e)
+		{
+			if (e == null || e.Parent != this)
+			{
+				return;
+			}
+
+			if (e is IDisposable)
+			{
+				((IDisposable)e).Dispose();
+			}
+			else
+			{
+				e.Parent = null;
+			}
+
+			Entries.Remove(e);
 		}
 
 		public void Dispose()
@@ -970,74 +1319,70 @@ namespace VitaNex.SuperGumps
 			}
 
 			IsDisposed = true;
+			IsOpen = Hidden = false;
 
-			//Console.WriteLine("SuperGump Disposing: {0} (0x{1:X})", GetType(), Serial);
-
-			//GC.SuppressFinalize(this);
+			if (OnActionDispose != null)
+			{
+				VitaNexCore.TryCatch(OnActionDispose, this);
+			}
 
 			VitaNexCore.TryCatch(OnDispose);
-
 			VitaNexCore.TryCatch(UnregisterInstance);
 
-			NextButtonID = 1;
-			NextSwitchID = 0;
-			NextTextInputID = 0;
+			Linked.ForEachReverse(g => VitaNexCore.TryCatch(Unlink, g));
+			Children.ForEachReverse(g => VitaNexCore.TryCatch(RemoveChild, g));
+			Entries.ForEachReverse(e => VitaNexCore.TryCatch(DisposeEntry, e));
 
 			if (InstancePoller != null)
 			{
 				VitaNexCore.TryCatch(InstancePoller.Dispose);
 			}
 
-			VitaNexCore.TryCatch(
-				() =>
-				{
-					Buttons.Clear();
-					TileButtons.Clear();
-					Switches.Clear();
-					Radios.Clear();
-					TextInputs.Clear();
-					LimitedTextInputs.Clear();
-
-					Entries.Free(true);
-
-					Layout.Clear();
-				});
-
-			VitaNexCore.TryCatch(
-				() =>
-				{
-					Linked.AsEnumerable().ForEach(Unlink);
-					Linked.Free(true);
-				});
-
-			VitaNexCore.TryCatch(
-				() =>
-				{
-					Children.AsEnumerable().ForEach(RemoveChild);
-					Children.Free(true);
-				});
-
-			IsOpen = false;
-			Hidden = false;
-
 			VitaNexCore.TryCatch(OnDisposed);
 
-			InstancePoller = null;
+			ObjectPool.Free(ref _Linked);
+			ObjectPool.Free(ref _Children);
+
+			ObjectPool.Free(ref _Controls);
+			ObjectPool.Free(ref _Layout);
+
+			ObjectPool.Free(ref _Buttons);
+			ObjectPool.Free(ref _TileButtons);
+			ObjectPool.Free(ref _Switches);
+			ObjectPool.Free(ref _Radios);
+			ObjectPool.Free(ref _TextInputs);
+			ObjectPool.Free(ref _LimitedTextInputs);
+
+			Entries.Free(true);
+
+			NextButtonID = 1;
+			NextSwitchID = 0;
+			NextTextInputID = 0;
+
+			OnActionSend = null;
+			OnActionClose = null;
+			OnActionHide = null;
+			OnActionRefresh = null;
+			OnActionDispose = null;
+			OnActionClick = null;
+			OnActionDoubleClick = null;
+
+			LastButtonClicked = null;
+			LastTileButtonClicked = null;
+
+			ButtonHandler = null;
+			TileButtonHandler = null;
+			SwitchHandler = null;
+			RadioHandler = null;
+			TextInputHandler = null;
+			LimitedTextInputHandler = null;
 
 			Parent = null;
 			User = null;
 
-			Buttons = null;
-			TileButtons = null;
-			Switches = null;
-			Radios = null;
-			TextInputs = null;
-			LimitedTextInputs = null;
+			InstancePoller = null;
 
-			Layout = null;
-
-			Linked = null;
-			Children = null;
+			VitaNexCore.TryCatch(OnAfterDisposed);
 		}
 
 		protected virtual void OnDispose()
@@ -1045,5 +1390,13 @@ namespace VitaNex.SuperGumps
 
 		protected virtual void OnDisposed()
 		{ }
+
+		protected virtual void OnAfterDisposed()
+		{ }
+
+		public override string ToString()
+		{
+			return String.Format("0x{0:X} \"{1}\"", Serial, this.GetTypeName(false));
+		}
 	}
 }

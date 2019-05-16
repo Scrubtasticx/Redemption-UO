@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -12,84 +12,37 @@
 #region References
 using System;
 
-using VitaNex.IO;
+using Server;
+using Server.Items;
 #endregion
 
 namespace VitaNex.Modules.AutoDonate
 {
 	public static class DonationEvents
 	{
-		#region DatabaseImported
-		public delegate void DatabaseImported(DatabaseImportedEventArgs e);
+		#region TransPending
+		public delegate void TransPending(TransPendingEventArgs e);
 
-		public static event DatabaseImported OnDatabaseImported;
+		public static event TransPending OnTransPending;
 
-		public static void InvokeDatabaseImported(IDataStore db)
+		public static void InvokeTransPending(DonationTransaction trans)
 		{
-			if (OnDatabaseImported != null)
+			if (OnTransPending != null)
 			{
-				OnDatabaseImported.Invoke(new DatabaseImportedEventArgs(db));
+				OnTransPending(new TransPendingEventArgs(trans));
 			}
 		}
 
-		public sealed class DatabaseImportedEventArgs : EventArgs
+		public sealed class TransPendingEventArgs : EventArgs
 		{
-			public DatabaseImportedEventArgs(IDataStore db)
-			{
-				Database = db;
-			}
+			public DonationTransaction Transaction { get; private set; }
 
-			public IDataStore Database { get; private set; }
-		}
-		#endregion DatabaseImported
-
-		#region DatabaseExported
-		public delegate void DatabaseExported(DatabaseExportedEventArgs e);
-
-		public static event DatabaseExported OnDatabaseExported;
-
-		public static void InvokeDatabaseExported(IDataStore db)
-		{
-			if (OnDatabaseExported != null)
-			{
-				OnDatabaseExported.Invoke(new DatabaseExportedEventArgs(db));
-			}
-		}
-
-		public sealed class DatabaseExportedEventArgs : EventArgs
-		{
-			public DatabaseExportedEventArgs(IDataStore db)
-			{
-				Database = db;
-			}
-
-			public IDataStore Database { get; private set; }
-		}
-		#endregion DatabaseExported
-
-		#region TransDelivered
-		public delegate void TransDelivered(TransDeliveredEventArgs e);
-
-		public static event TransDelivered OnTransDelivered;
-
-		public static void InvokeTransDelivered(DonationTransaction trans)
-		{
-			if (OnTransDelivered != null)
-			{
-				OnTransDelivered.Invoke(new TransDeliveredEventArgs(trans));
-			}
-		}
-
-		public sealed class TransDeliveredEventArgs : EventArgs
-		{
-			public TransDeliveredEventArgs(DonationTransaction trans)
+			public TransPendingEventArgs(DonationTransaction trans)
 			{
 				Transaction = trans;
 			}
-
-			public DonationTransaction Transaction { get; private set; }
 		}
-		#endregion TransDelivered
+		#endregion TransPending
 
 		#region TransVoided
 		public delegate void TransVoided(TransVoidedEventArgs e);
@@ -100,18 +53,18 @@ namespace VitaNex.Modules.AutoDonate
 		{
 			if (OnTransVoided != null)
 			{
-				OnTransVoided.Invoke(new TransVoidedEventArgs(trans));
+				OnTransVoided(new TransVoidedEventArgs(trans));
 			}
 		}
 
 		public sealed class TransVoidedEventArgs : EventArgs
 		{
+			public DonationTransaction Transaction { get; private set; }
+
 			public TransVoidedEventArgs(DonationTransaction trans)
 			{
 				Transaction = trans;
 			}
-
-			public DonationTransaction Transaction { get; private set; }
 		}
 		#endregion TransVoided
 
@@ -120,22 +73,25 @@ namespace VitaNex.Modules.AutoDonate
 
 		public static event TransClaimed OnTransClaimed;
 
-		public static void InvokeTransClaimed(DonationTransaction trans)
+		public static void InvokeTransClaimed(DonationTransaction trans, Mobile deliverTo)
 		{
 			if (OnTransClaimed != null)
 			{
-				OnTransClaimed.Invoke(new TransClaimedEventArgs(trans));
+				OnTransClaimed(new TransClaimedEventArgs(trans, deliverTo));
 			}
 		}
 
 		public sealed class TransClaimedEventArgs : EventArgs
 		{
-			public TransClaimedEventArgs(DonationTransaction trans)
+			public DonationTransaction Transaction { get; private set; }
+
+			public Mobile DeliverTo { get; set; }
+
+			public TransClaimedEventArgs(DonationTransaction trans, Mobile deliverTo)
 			{
 				Transaction = trans;
+				DeliverTo = deliverTo;
 			}
-
-			public DonationTransaction Transaction { get; private set; }
 		}
 		#endregion TransClaimed
 
@@ -148,18 +104,18 @@ namespace VitaNex.Modules.AutoDonate
 		{
 			if (OnTransProcessed != null)
 			{
-				OnTransProcessed.Invoke(new TransProcessedEventArgs(trans));
+				OnTransProcessed(new TransProcessedEventArgs(trans));
 			}
 		}
 
 		public sealed class TransProcessedEventArgs : EventArgs
 		{
+			public DonationTransaction Transaction { get; private set; }
+
 			public TransProcessedEventArgs(DonationTransaction trans)
 			{
 				Transaction = trans;
 			}
-
-			public DonationTransaction Transaction { get; private set; }
 		}
 		#endregion TransProcessed
 
@@ -168,51 +124,127 @@ namespace VitaNex.Modules.AutoDonate
 
 		public static event StateChanged OnStateChanged;
 
-		public static void InvokeStateChanged(DonationTransaction trans, DonationTransactionState oldState)
+		public static void InvokeStateChanged(DonationTransaction trans, TransactionState oldState)
 		{
 			if (OnStateChanged != null)
 			{
-				OnStateChanged.Invoke(new StateChangedEventArgs(trans, oldState));
+				OnStateChanged(new StateChangedEventArgs(trans, oldState));
 			}
 		}
 
 		public sealed class StateChangedEventArgs : EventArgs
 		{
-			public StateChangedEventArgs(DonationTransaction trans, DonationTransactionState oldState)
+			public DonationTransaction Transaction { get; private set; }
+			public TransactionState OldState { get; private set; }
+
+			public StateChangedEventArgs(DonationTransaction trans, TransactionState oldState)
 			{
 				Transaction = trans;
 				OldState = oldState;
 			}
-
-			public DonationTransaction Transaction { get; private set; }
-			public DonationTransactionState OldState { get; private set; }
 		}
 		#endregion StateChanged
 
-		#region ExceptionRaised
-		public delegate void ExceptionRaised(ExceptionEventArgs e);
+		#region TransactionExchange
+		public delegate void TransExchanger(TransExchangeEventArgs e);
 
-		public static event ExceptionRaised OnException;
+		public static event TransExchanger OnTransExchange;
 
-		public static void InvokeException(Exception e, string format, params object[] args)
+		public static long InvokeTransExchange(DonationTransaction trans, DonationProfile dp)
 		{
-			if (OnException != null)
+			var e = new TransExchangeEventArgs(trans, dp);
+
+			if (OnTransExchange != null)
 			{
-				OnException.Invoke(new ExceptionEventArgs(e, format ?? String.Empty, args));
+				OnTransExchange(e);
+			}
+
+			return e.Exchanged;
+		}
+
+		public sealed class TransExchangeEventArgs : EventArgs
+		{
+			public DonationTransaction Transaction { get; private set; }
+			public DonationProfile Profile { get; private set; }
+
+			public long Exchanged { get; set; }
+
+			public ulong Flags { get; set; }
+
+			public TransExchangeEventArgs(DonationTransaction trans, DonationProfile dp)
+			{
+				Transaction = trans;
+				Profile = dp;
+
+				Exchanged = Transaction.Credit;
+			}
+		}
+		#endregion
+
+		#region TransactionPack
+		public delegate void TransPacker(TransPackEventArgs e);
+
+		public static event TransPacker OnTransPack;
+
+		public static Container InvokeTransPack(DonationTransaction trans, DonationProfile dp)
+		{
+			var cont = new Bag
+			{
+				Name = "A Donation Reward Bag",
+				Hue = 1152
+			};
+
+			var e = new TransPackEventArgs(trans, dp, cont);
+
+			if (OnTransPack != null)
+			{
+				OnTransPack(e);
+			}
+
+			return e.Container;
+		}
+
+		public sealed class TransPackEventArgs : EventArgs
+		{
+			public DonationTransaction Transaction { get; private set; }
+			public DonationProfile Profile { get; private set; }
+
+			public Container Container { get; set; }
+
+			public ulong Flags { get; set; }
+
+			public TransPackEventArgs(DonationTransaction trans, DonationProfile dp, Container cont)
+			{
+				Transaction = trans;
+				Profile = dp;
+
+				Container = cont;
+			}
+		}
+		#endregion
+
+		#region TransactionDeleted
+		public delegate void TransactionDeleted(TransactionDeletedEventArgs e);
+
+		public static event TransactionDeleted OnTransactionDeleted;
+
+		public static void InvokeTransactionDeleted(DonationTransaction trans)
+		{
+			if (OnTransactionDeleted != null)
+			{
+				OnTransactionDeleted(new TransactionDeletedEventArgs(trans));
 			}
 		}
 
-		public sealed class ExceptionEventArgs : EventArgs
+		public sealed class TransactionDeletedEventArgs : EventArgs
 		{
-			public ExceptionEventArgs(Exception ex, string format, params object[] args)
-			{
-				Exception = ex;
-				Message = String.Format(format, args);
-			}
+			public DonationTransaction Transaction { get; private set; }
 
-			public Exception Exception { get; private set; }
-			public string Message { get; private set; }
+			public TransactionDeletedEventArgs(DonationTransaction trans)
+			{
+				Transaction = trans;
+			}
 		}
-		#endregion ExceptionRaised
+		#endregion StateChanged
 	}
 }

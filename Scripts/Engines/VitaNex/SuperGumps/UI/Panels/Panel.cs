@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -13,21 +13,18 @@
 using System;
 using System.Collections.Generic;
 
+using Server;
 using Server.Gumps;
-using Server.Mobiles;
 #endregion
 
 namespace VitaNex.SuperGumps.UI
 {
 	public class PanelGump<T> : SuperGump
 	{
-		public static string DefaultTitle = "Panel View";
-		public static string DefaultEmptyText = "No entry to display.";
-
 		private int _Width;
 		private int _Height;
 
-		protected bool WasModal;
+		protected bool WasModal { get; set; }
 
 		public virtual string Title { get; set; }
 		public virtual string EmptyText { get; set; }
@@ -42,7 +39,7 @@ namespace VitaNex.SuperGumps.UI
 		public virtual int Height { get { return _Height; } set { _Height = Math.Max(250, Math.Min(786, value)); } }
 
 		public PanelGump(
-			PlayerMobile user,
+			Mobile user,
 			Gump parent = null,
 			int? x = null,
 			int? y = null,
@@ -57,8 +54,8 @@ namespace VitaNex.SuperGumps.UI
 			Width = width;
 			Height = height;
 			Selected = selected;
-			EmptyText = emptyText ?? DefaultEmptyText;
-			Title = title ?? DefaultTitle;
+			EmptyText = emptyText ?? "No entry to display.";
+			Title = title ?? "Panel View";
 			Minimized = false;
 			CanMove = false;
 
@@ -84,13 +81,21 @@ namespace VitaNex.SuperGumps.UI
 		{
 			base.CompileLayout(layout);
 
+			var sup = SupportsUltimaStore;
+			var ec = IsEnhancedClient;
+			var bgID = ec ? 83 : sup ? 40000 : 9270;
+
 			layout.Add(
 				"background/header/base",
 				() =>
 				{
-					AddBackground(0, 0, Width, 50, 9270);
-					AddImageTiled(10, 10, Width - 20, 30, 2624);
-					//AddAlphaRegion(10, 10, Width - 20, 30);
+					AddBackground(0, 0, Width, 50, bgID);
+
+					if (!ec)
+					{
+						AddImageTiled(10, 10, Width - 20, 30, 2624);
+						//AddAlphaRegion(10, 10, Width - 20, 30);
+					}
 				});
 
 			layout.Add(
@@ -119,7 +124,7 @@ namespace VitaNex.SuperGumps.UI
 
 			layout.Add(
 				"label/header/title",
-				() => AddLabelCropped(90, 15, Width - 135, 20, GetTitleHue(), String.IsNullOrEmpty(Title) ? DefaultTitle : Title));
+				() => AddLabelCropped(90, 15, Width - 135, 20, GetTitleHue(), String.IsNullOrEmpty(Title) ? "Panel View" : Title));
 
 			if (Minimized)
 			{
@@ -130,17 +135,20 @@ namespace VitaNex.SuperGumps.UI
 				"background/body/base",
 				() =>
 				{
-					AddBackground(0, 50, Width, Height, 9270);
-					AddImageTiled(10, 60, Width - 20, Height - 20, 2624);
-					//AddAlphaRegion(10, 60, Width - 20, Height - 20);
+					AddBackground(0, 50, Width, Height, bgID);
+
+					if (!ec)
+					{
+						AddImageTiled(10, 60, Width - 20, Height - 20, 2624);
+						//AddAlphaRegion(10, 60, Width - 20, Height - 20);
+					}
 				});
 
 			if (Selected == null)
 			{
-				layout.Add(
-					"label/list/empty",
-					() =>
-					AddLabelCropped(15, 67, Width - 30, 20, ErrorHue, String.IsNullOrEmpty(EmptyText) ? DefaultEmptyText : EmptyText));
+				var text = String.IsNullOrEmpty(EmptyText) ? "No entry to display." : EmptyText;
+
+				layout.Add("label/list/empty", () => AddLabelCropped(15, 67, Width - 30, 20, ErrorHue, text));
 			}
 		}
 

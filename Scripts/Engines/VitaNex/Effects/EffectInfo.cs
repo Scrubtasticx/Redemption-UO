@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -95,6 +95,7 @@ namespace VitaNex.FX
 			if (source == null)
 			{
 				Source = null;
+				Map = null;
 				return;
 			}
 
@@ -102,18 +103,6 @@ namespace VitaNex.FX
 			{
 				Source = (IEntity)source;
 				Map = Source.Map;
-				return;
-			}
-
-			if (Source is Mobile)
-			{
-				((Mobile)Source).Location = source.Clone3D();
-				return;
-			}
-
-			if (Source is Item)
-			{
-				((Item)Source).Location = source.Clone3D();
 				return;
 			}
 
@@ -168,7 +157,15 @@ namespace VitaNex.FX
 				Effects.PlaySound(Source, Map, SoundID);
 			}
 
-			Effects.SendLocationEffect(Source, Map, EffectID, Duration, Speed, Hue, (int)Render);
+			if (Source.Map == Map && (Source is Mobile || Source is Item))
+			{
+				Effects.SendTargetEffect(Source, EffectID, Speed, Duration, Hue, (int)Render);
+			}
+			else
+			{
+				Effects.SendLocationEffect(Source, Map, EffectID, Duration, Speed, Hue, (int)Render);
+			}
+
 			return true;
 		}
 
@@ -223,7 +220,11 @@ namespace VitaNex.FX
 
 		public virtual IEntity Target { get; set; }
 
-		public override int Duration { get { return (int)(GetTravelTime().TotalMilliseconds / 100.0); } set { base.Duration = value; } }
+		public override int Duration
+		{
+			get { return (int)(GetTravelTime().TotalMilliseconds / 100.0); }
+			set { base.Duration = value; }
+		}
 
 		public MovingEffectInfo(
 			IPoint3D source,
@@ -276,12 +277,10 @@ namespace VitaNex.FX
 
 		public override void Send()
 		{
-			if (IsDisposed || Source == null || Target == null || Map == null)
+			if (!IsDisposed && Source != null && Target != null && Map != null)
 			{
-				return;
+				base.Send();
 			}
-
-			base.Send();
 		}
 
 		protected override bool OnSend()
@@ -289,6 +288,11 @@ namespace VitaNex.FX
 			if (IsDisposed || Source == null || Target == null || Map == null)
 			{
 				return false;
+			}
+
+			if (SoundID > 0)
+			{
+				Effects.PlaySound(Source, Map, SoundID);
 			}
 
 			Effects.SendMovingEffect(Source, Target, EffectID, Speed, Duration, false, false, Hue, (int)Render);
@@ -314,11 +318,6 @@ namespace VitaNex.FX
 						{
 							ImpactTimer.Stop();
 							ImpactTimer = null;
-						}
-
-						if (IsDisposed)
-						{
-							return;
 						}
 
 						if (ImpactCallback != null)

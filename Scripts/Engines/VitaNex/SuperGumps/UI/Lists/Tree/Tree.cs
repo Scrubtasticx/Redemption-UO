@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -17,7 +17,8 @@ using System.Linq;
 
 using Server;
 using Server.Gumps;
-using Server.Mobiles;
+
+using VitaNex.Collections;
 #endregion
 
 namespace VitaNex.SuperGumps.UI
@@ -33,10 +34,13 @@ namespace VitaNex.SuperGumps.UI
 
 		public TreeGumpNode SelectedNode { get; set; }
 
-		public virtual Dictionary<TreeGumpNode, Action<Rectangle2D, int, TreeGumpNode>> Nodes { get; private set; }
+		public int Width { get; set; }
+		public int Height { get; set; }
+
+		public virtual Dictionary<TreeGumpNode, Action<Rectangle, int, TreeGumpNode>> Nodes { get; private set; }
 
 		public TreeGump(
-			PlayerMobile user,
+			Mobile user,
 			Gump parent = null,
 			int? x = null,
 			int? y = null,
@@ -45,7 +49,7 @@ namespace VitaNex.SuperGumps.UI
 			string title = null)
 			: base(user, parent, x, y, nodes)
 		{
-			Nodes = new Dictionary<TreeGumpNode, Action<Rectangle2D, int, TreeGumpNode>>();
+			Nodes = new Dictionary<TreeGumpNode, Action<Rectangle, int, TreeGumpNode>>();
 
 			Title = title ?? DefaultTitle;
 			TitleColor = DefaultHtmlColor;
@@ -53,9 +57,10 @@ namespace VitaNex.SuperGumps.UI
 			HtmlColor = DefaultHtmlColor;
 
 			HighlightHue = 1258;
-			TextHue = 2049;
+			TextHue = 1153;
 
-			EntriesPerPage = 14;
+			Width = 600;
+			Height = 400;
 
 			SelectedNode = selected ?? String.Empty;
 
@@ -66,9 +71,14 @@ namespace VitaNex.SuperGumps.UI
 
 		protected override void Compile()
 		{
+			Width = Math.Max(600, Width);
+			Height = Math.Max(400, Height);
+
+			EntriesPerPage = (int)Math.Floor((Height - 88) / 22.0);
+
 			if (Nodes == null)
 			{
-				Nodes = new Dictionary<TreeGumpNode, Action<Rectangle2D, int, TreeGumpNode>>();
+				Nodes = new Dictionary<TreeGumpNode, Action<Rectangle, int, TreeGumpNode>>();
 			}
 
 			CompileNodes(Nodes);
@@ -76,7 +86,7 @@ namespace VitaNex.SuperGumps.UI
 			base.Compile();
 		}
 
-		protected virtual void CompileNodes(Dictionary<TreeGumpNode, Action<Rectangle2D, int, TreeGumpNode>> list)
+		protected virtual void CompileNodes(Dictionary<TreeGumpNode, Action<Rectangle, int, TreeGumpNode>> list)
 		{ }
 
 		protected override void CompileList(List<TreeGumpNode> list)
@@ -86,7 +96,11 @@ namespace VitaNex.SuperGumps.UI
 				list.AddOrReplace(n);
 			}
 
-			var nodes = new List<TreeGumpNode>(list.Count);
+			var nodes = ListPool<TreeGumpNode>.AcquireObject();
+			var selected = ListPool<TreeGumpNode>.AcquireObject();
+			var parents = ListPool<TreeGumpNode>.AcquireObject();
+
+			nodes.Capacity = list.Count;
 
 			foreach (var n in list)
 			{
@@ -103,41 +117,46 @@ namespace VitaNex.SuperGumps.UI
 				nodes.AddOrReplace(SelectedNode.Parent);
 			}
 
-			var selectedParents = SelectedNode.GetParents().ToArray();
+			selected.AddRange(SelectedNode.GetParents());
 
 			nodes.RemoveAll(
 				c =>
 				{
-					var parents = c.GetParents().ToArray();
+					parents.AddRange(c.GetParents());
 
-					if (parents.Length > 0)
+					var remove = false;
+
+					if (parents.Count > 0)
 					{
-						if (parents.Length <= selectedParents.Length && c != SelectedNode && !parents.Contains(SelectedNode) &&
-							!selectedParents.Any(p => p == c || c.Parent == p))
+						if (parents.Count <= selected.Count && c != SelectedNode && !parents.Contains(SelectedNode) &&
+							!selected.Any(p => p == c || c.Parent == p))
 						{
-							return true;
+							remove = true;
 						}
-
-						if (parents.Length > selectedParents.Length && c.Parent != SelectedNode)
+						else if (parents.Count > selected.Count && c.Parent != SelectedNode)
 						{
-							return true;
+							remove = true;
 						}
 					}
 
-					return false;
+					parents.Clear();
+
+					return remove;
 				});
 
 			list.Clear();
 			list.AddRange(nodes);
 
-			nodes.Free(true);
+			ObjectPool.Free(ref nodes);
+			ObjectPool.Free(ref selected);
+			ObjectPool.Free(ref parents);
 
 			base.CompileList(list);
 		}
 
 		public override int SortCompare(TreeGumpNode l, TreeGumpNode r)
 		{
-			int res = 0;
+			var res = 0;
 
 			if (l.CompareNull(r, ref res))
 			{
@@ -151,49 +170,76 @@ namespace VitaNex.SuperGumps.UI
 		{
 			base.CompileLayout(layout);
 
+			var sup = SupportsUltimaStore;
+			var ec = IsEnhancedClient;
+			var bgID = ec ? 83 : sup ? 40000 : 9270;
+
 			layout.Add(
 				"body/bg",
 				() =>
 				{
-					AddBackground(0, 43, 600, 400, 9260);
+					AddBackground(0, 43, Width, Height, 9260);
 					AddImage(15, 18, 1419);
-
-					AddBackground(15, 58, 234, 50, 9270);
+					AddBackground(15, 58, 234, 50, bgID);
 					AddImage(92, 0, 1417);
 				});
+
 			layout.Add("body/mainbutton", () => AddButton(101, 9, 5545, 5546, MainButtonHandler));
 
-			layout.Add("panel/left", () => AddBackground(45, 115, 204, 312, 9270));
-			layout.Add("panel/left/overlay", () => AddImageTiled(55, 125, 184, 292, 1280));
+			layout.Add("panel/left", () => AddBackground(45, 115, 204, Height - 88, bgID));
 
-			layout.Add("panel/right", () => AddBackground(255, 58, 330, 370, 9270));
-			layout.Add("panel/right/overlay", () => AddImageTiled(265, 68, 310, 350, 1280));
+			layout.Add(
+				"panel/left/overlay",
+				() =>
+				{
+					if (!ec)
+					{
+						AddImageTiled(55, 125, 184, Height - 108, 2624);
+					}
+				});
 
 			CompileTreeLayout(layout);
 
+			layout.Add("panel/right", () => AddBackground(255, 58, Width - 270, Height - 30, bgID));
+
+			layout.Add(
+				"panel/right/overlay",
+				() =>
+				{
+					if (!ec)
+					{
+						AddImageTiled(265, 68, Width - 290, Height - 50, 2624);
+					}
+				});
+
 			layout.Add(
 				"title",
-				() => AddHtml(25, 78, 214, 40, Title.WrapUOHtmlTag("CENTER").WrapUOHtmlColor(TitleColor, false), false, false));
+				() => AddHtml(25, 78, 215, 40, Title.WrapUOHtmlCenter().WrapUOHtmlColor(TitleColor, false), false, false));
+
+			layout.Add("dragon", () => AddImage(Width - 33, 0, 10441, 0));
 
 			if (SelectedNode.IsEmpty)
 			{
-				CompileEmptyNodeLayout(layout, 265, 70, 310, 350, List.IndexOf(SelectedNode), SelectedNode);
+				CompileEmptyNodeLayout(layout, 265, 70, Width - 290, Height - 55, List.IndexOf(SelectedNode), SelectedNode);
 			}
 			else
 			{
-				CompileNodeLayout(layout, 265, 70, 310, 350, List.IndexOf(SelectedNode), SelectedNode);
+				CompileNodeLayout(layout, 265, 70, Width - 290, Height - 55, List.IndexOf(SelectedNode), SelectedNode);
 			}
-
-			layout.Add("dragon", () => AddImage(567, 0, 10441, 0));
 		}
 
 		protected virtual void CompileTreeLayout(SuperGumpLayout layout)
 		{
+			var sup = SupportsUltimaStore;
+			var ec = IsEnhancedClient;
+			var bgID = ec ? 83 : sup ? 40000 : 9270;
+			var bgCol = Color.Black;
+
 			layout.Add(
 				"tree/scrollbar",
 				() =>
 				{
-					AddBackground(15, 115, 25, 312, 9270);
+					AddBackground(15, 115, 25, Height - 88, bgID);
 
 					AddScrollbarV(
 						15,
@@ -202,9 +248,9 @@ namespace VitaNex.SuperGumps.UI
 						Page,
 						PreviousPage,
 						NextPage,
-						new Rectangle2D(6, 40, 13, 234),
-						new Rectangle2D(6, 5, 13, 28),
-						new Rectangle2D(6, 280, 13, 28),
+						new Rectangle(6, 40, 13, Height - 166),
+						new Rectangle(6, 5, 13, 28),
+						new Rectangle(6, Height - 120, 13, 28),
 						// track, handle
 						Tuple.Create(10740, 10742),
 						// normal, pressed, inactive
@@ -213,78 +259,68 @@ namespace VitaNex.SuperGumps.UI
 						Tuple.Create(10721, 10722, 10720));
 				});
 
-			var range = GetListRange();
+			var cIndex = 0;
 
-			const int catSpacing = 21;
-
-			int cIndex = 0;
-
-			foreach (var c in range.Values)
+			foreach (var c in EnumerateListRange())
 			{
-				int index = cIndex;
-				var depth = c.Depth;
-
-				layout.AddBefore(
-					"panel/left",
-					"tree/button/" + index,
-					() => AddButton(55, 125 + (catSpacing * index), 1122, 1124, btn => SelectNode(index, c)));
+				var node = c;
+				var index = cIndex++;
+				var offset = Math.Min(150, node.Depth * 10);
 
 				layout.Add(
-					"tree/node/" + index,
+					"tree/button/" + index,
 					() =>
 					{
-						int offset = Math.Min(150, depth * 10);
-
-						//AddBackground(60 + offset, 125 + (catSpacing * index), 174 - offset, 20, 9200);
-
-						AddLabelCropped(
+						AddHtmlButton(
 							65 + offset,
-							125 + (catSpacing * index),
+							125 + (21 * index),
 							165 - offset,
 							20,
-							SelectedNode == c || SelectedNode.IsChildOf(c) ? HighlightHue : TextHue,
-							String.IsNullOrWhiteSpace(c.Name) ? "..." : c.Name);
+							btn => SelectNode(node),
+							GetNodeName(node),
+							GetNodeColor(node),
+							bgCol);
 					});
-
-				++cIndex;
 			}
 		}
 
 		protected virtual void CompileEmptyNodeLayout(
-			SuperGumpLayout layout, int x, int y, int w, int h, int index, TreeGumpNode node)
+			SuperGumpLayout layout,
+			int x,
+			int y,
+			int w,
+			int h,
+			int index,
+			TreeGumpNode node)
 		{ }
 
 		protected virtual void CompileNodeLayout(
-			SuperGumpLayout layout, int x, int y, int w, int h, int index, TreeGumpNode node)
+			SuperGumpLayout layout,
+			int x,
+			int y,
+			int w,
+			int h,
+			int index,
+			TreeGumpNode node)
 		{
 			if (Nodes == null || Nodes.Count <= 0)
 			{
 				return;
 			}
 
-			Action<Rectangle2D, Int32, TreeGumpNode> nodeLayout;
+			Action<Rectangle, Int32, TreeGumpNode> nodeLayout;
 
-			if (Nodes.TryGetValue(node.FullName, out nodeLayout) && nodeLayout != null)
+			if (Nodes.TryGetValue(node, out nodeLayout) && nodeLayout != null)
 			{
-				layout.Add("node/page/" + index, () => nodeLayout(new Rectangle2D(x, y, w, h), index, node));
+				var o = new Rectangle(x, y, w, h);
+
+				layout.Add("node/page/" + index, () => nodeLayout(o, index, node));
 			}
 		}
 
 		public override void InvalidatePageCount()
 		{
-			//int oldpc = PageCount;
-
 			PageCount = 1 + Math.Max(0, List.Count - EntriesPerPage);
-
-			/*if (oldpc < PageCount)
-			{
-				++Page;
-			}
-			else if (oldpc > PageCount)
-			{
-				--Page;
-			}*/
-
 			Page = Math.Max(0, Math.Min(PageCount - 1, Page));
 		}
 
@@ -293,8 +329,25 @@ namespace VitaNex.SuperGumps.UI
 			return GetListRange(Page, EntriesPerPage);
 		}
 
-		public void SelectNode(int index, TreeGumpNode node)
+		public virtual int GetNodeHue(TreeGumpNode node)
 		{
+			return node != null && SelectedNode != node && !SelectedNode.IsChildOf(node) ? TextHue : HighlightHue;
+		}
+
+		public virtual Color GetNodeColor(TreeGumpNode node)
+		{
+			return node != null && SelectedNode != node && !SelectedNode.IsChildOf(node) ? Color.White : Color.Gold;
+		}
+
+		public virtual string GetNodeName(TreeGumpNode node)
+		{
+			return node == null || String.IsNullOrWhiteSpace(node.Name) ? "..." : node.Name;
+		}
+
+		public void SelectNode(TreeGumpNode node)
+		{
+			var old = SelectedNode;
+
 			if (SelectedNode != node)
 			{
 				SelectedNode = node;
@@ -305,20 +358,20 @@ namespace VitaNex.SuperGumps.UI
 			}
 			else
 			{
-				SelectedNode = String.Empty;
+				SelectedNode = TreeGumpNode.Empty;
 			}
 
-			OnSelected(index, SelectedNode);
+			OnSelected(old, SelectedNode);
 		}
 
-		protected virtual void OnSelected(int index, TreeGumpNode node)
+		protected virtual void OnSelected(TreeGumpNode oldNode, TreeGumpNode newNode)
 		{
 			Refresh(true);
 		}
 
 		protected virtual void MainButtonHandler(GumpButton b)
 		{
-			Refresh();
+			Refresh(true);
 		}
 
 		protected override void OnDispose()

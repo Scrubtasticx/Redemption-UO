@@ -3,7 +3,7 @@
 //   .      __,-; ,'( '/
 //    \.    `-.__`-._`:_,-._       _ , . ``
 //     `:-._,------' ` _,`--` -: `_ , ` ,' :
-//        `---..__,,--'  (C) 2014  ` -'. -'
+//        `---..__,,--'  (C) 2018  ` -'. -'
 //        #  Vita-Nex [http://core.vita-nex.com]  #
 //  {o)xxx|===============-   #   -===============|xxx(o}
 //        #        The MIT License (MIT)          #
@@ -11,6 +11,8 @@
 
 #region References
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 using Server;
 using Server.Items;
@@ -20,27 +22,42 @@ namespace VitaNex.Items
 {
 	public class StrobeLantern : Lantern
 	{
-		private Timer _Timer;
-		private int _HueCycleIndex;
-		private TimeSpan _HueCycleDelay;
+		private static readonly short[] _Hues = {11, 22, 33, 44, 55, 66, 77, 88, 99};
+		private static readonly LightType[] _Lights = {LightType.Circle150, LightType.Circle225, LightType.Circle300};
+
+		public static List<StrobeLantern> Instances { get; private set; }
+
+		private static PollTimer _Timer;
+
+		static StrobeLantern()
+		{
+			Instances = new List<StrobeLantern>();
+
+			_Timer = PollTimer.FromSeconds(1.0, CheckStrobe, Instances.Any);
+		}
+
+		private static void CheckStrobe()
+		{
+			Instances.ForEachReverse(o => o.Strobe());
+		}
+
+		private long _NextUpdate;
+		private int _StrobeIndex;
 
 		[CommandProperty(AccessLevel.GameMaster)]
+		public bool StrobeReverse { get; set; }
+
+		[CommandProperty(AccessLevel.GameMaster)]
+		public TimeSpan StrobeInterval { get; set; }
+
+		[Hue, CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
 		public override int Hue
 		{
 			get
 			{
-				if (Burning && HueCycle != null && HueCycle.Length > 0)
+				if (CanStrobe() && Hues.InBounds(_StrobeIndex))
 				{
-					if (_HueCycleIndex >= HueCycle.Length)
-					{
-						_HueCycleIndex = 0;
-					}
-					else if (_HueCycleIndex < 0)
-					{
-						_HueCycleIndex = HueCycle.Length - 1;
-					}
-
-					return HueCycle[_HueCycleIndex];
+					return Hues[_StrobeIndex];
 				}
 
 				return base.Hue;
@@ -48,186 +65,209 @@ namespace VitaNex.Items
 			set { base.Hue = value; }
 		}
 
-		[CommandProperty(AccessLevel.GameMaster)]
-		public virtual TimeSpan HueCycleDelay
-		{
-			get { return _HueCycleDelay; }
-			set
-			{
-				_HueCycleDelay = TimeSpan.FromSeconds(Math.Max(0.100, value.TotalSeconds));
+		public virtual short[] Hues { get { return _Hues; } }
+		public virtual LightType[] Lights { get { return _Lights; } }
 
-				if (_Timer != null)
-				{
-					_Timer.Interval = _HueCycleDelay;
-				}
-			}
-		}
-
-		[CommandProperty(AccessLevel.GameMaster)]
-		public virtual bool HueCycleReverse { get; set; }
-
-		public virtual short[] HueCycle { get; set; }
-		public virtual LightType[] Lights { get; set; }
+		public virtual LightType DefaultLight { get { return LightType.DarkCircle300; } }
+		public virtual TimeSpan DefaultStrobeInterval { get { return TimeSpan.FromSeconds(0.5); } }
 
 		[Constructable]
 		public StrobeLantern()
 		{
 			Name = "Strobe Lantern";
 			Weight = 4;
-			Light = LightType.Circle300;
 			Hue = 0;
 
-			HueCycleDelay = TimeSpan.FromSeconds(0.5);
-			HueCycle = new short[] {1, 11, 22, 33, 44, 55, 66, 77, 88, 99};
-			Lights = new[] {LightType.Circle150, LightType.Circle225, LightType.Circle300};
+			Light = DefaultLight;
+			StrobeInterval = DefaultStrobeInterval;
+
+			Instances.Add(this);
 		}
 
 		public StrobeLantern(Serial serial)
 			: base(serial)
-		{ }
-
-#if NEWPARENT
-		public override void OnAdded(IEntity parent)
-#else
-		public override void OnAdded(object parent)
-#endif
 		{
-			base.OnAdded(parent);
-
-			if (!Burning || !(Parent is Mobile))
-			{
-				EndHueCycle();
-				return;
-			}
-
-			EndHueCycle();
-			BeginHueCycle();
+			Instances.Add(this);
 		}
 
-#if NEWPARENT
-		public override void OnRemoved(IEntity parent)
-#else
-		public override void OnRemoved(object parent)
-#endif
+		public override void OnDelete()
 		{
-			base.OnRemoved(parent);
+			base.OnDelete();
 
-			if (!Burning || !(parent is Mobile))
+			Instances.Remove(this);
+		}
+
+		public override void OnAfterDelete()
+		{
+			base.OnAfterDelete();
+
+			Instances.Remove(this);
+		}
+
+		public virtual bool CanStrobe()
+		{
+			return !Deleted && Burning && Map != null && Map != Map.Internal && !Hues.IsNullOrEmpty();
+		}
+
+		public void Strobe()
+		{
+			if (!CanStrobe() || VitaNexCore.Ticks < _NextUpdate)
 			{
-				EndHueCycle();
 				return;
 			}
 
-			EndHueCycle();
-			BeginHueCycle();
+			_NextUpdate = VitaNexCore.Ticks + (int)StrobeInterval.TotalMilliseconds;
+
+			var index = ++_StrobeIndex % Hues.Length;
+
+			if (StrobeReverse)
+			{
+				index = (Hues.Length - index) - 1;
+			}
+
+			_StrobeIndex = index;
+
+			OnStrobe();
 		}
 
 		public override void Ignite()
 		{
+			var old = Burning;
+
 			base.Ignite();
 
-			if (Burning)
+			if (!old && Burning)
 			{
-				BeginHueCycle();
+				OnStrobeBegin();
+			}
+			else if (old && !Burning)
+			{
+				OnStrobeEnd();
 			}
 		}
 
-		public override void Burn()
+		public override void Douse()
 		{
-			base.Burn();
+			var old = Burning;
 
-			if (!Burning)
+			base.Douse();
+
+			if (!old && Burning)
 			{
-				EndHueCycle();
+				OnStrobeBegin();
+			}
+			else if (old && !Burning)
+			{
+				OnStrobeEnd();
 			}
 		}
 
-		private void BeginHueCycle()
+		protected virtual void OnStrobe()
 		{
-			if (_Timer == null)
-			{
-				_Timer = Timer.DelayCall(HueCycleDelay, HueCycleDelay, CycleHue);
-			}
-			else
-			{
-				_Timer.Start();
-			}
+			Light = Lights.GetRandom(Light);
 
-			OnHueCycleBegin();
+			Update();
 		}
 
-		private void EndHueCycle()
+		protected virtual void OnStrobeBegin()
 		{
-			if (_Timer != null)
-			{
-				_Timer.Stop();
-				_Timer = null;
-			}
+			Light = Lights.GetRandom(Light);
 
-			Light = LightType.DarkCircle300;
-
-			OnHueCycleEnd();
+			Update();
 		}
 
-		private void CycleHue()
+		protected virtual void OnStrobeEnd()
 		{
-			if (Map == null || Map == Map.Internal || (!(Parent is Mobile) && Parent != null))
-			{
-				EndHueCycle();
-				return;
-			}
+			Light = DefaultLight;
 
-			if (HueCycleReverse)
-			{
-				--_HueCycleIndex;
-			}
-			else
-			{
-				++_HueCycleIndex;
-			}
+			Update();
+		}
 
-			if (Lights != null && Lights.Length > 0)
-			{
-				Light = Lights.GetRandom();
-			}
-
+		public virtual void Update()
+		{
 			ReleaseWorldPackets();
 			Delta(ItemDelta.Update);
-
-			OnHueCycled();
 		}
 
-		protected virtual void OnHueCycled()
-		{ }
+		public override void OnDoubleClick(Mobile m)
+		{
+			var access = Protected ? AccessLevel.Counselor : AccessLevel.Player;
 
-		protected virtual void OnHueCycleBegin()
-		{ }
-
-		protected virtual void OnHueCycleEnd()
-		{ }
+			if (this.CheckUse(m, true, false, 2, false, false, true, access))
+			{
+				base.OnDoubleClick(m);
+			}
+		}
 
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			writer.Write(0);
+			var v = writer.SetVersion(2);
 
-			writer.Write(_HueCycleDelay);
-			writer.Write(_HueCycleIndex);
-			writer.Write(HueCycleReverse);
-			writer.WriteArray(HueCycle, writer.Write);
+			switch (v)
+			{
+				case 2:
+				{
+					writer.Write(StrobeReverse);
+					writer.Write(StrobeInterval);
+
+					writer.Write(Burning);
+				}
+					break;
+				// Old
+				case 1:
+					writer.Write(Burning);
+					goto case 0;
+				case 0:
+				{
+					writer.Write(StrobeInterval);
+					writer.Write(_StrobeIndex);
+					writer.Write(StrobeReverse);
+
+					writer.WriteArray(Hues, (w, o) => w.Write(o));
+				}
+					break;
+			}
 		}
 
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
 
-			reader.ReadInt();
+			var v = reader.GetVersion();
 
-			_HueCycleDelay = reader.ReadTimeSpan();
-			_HueCycleIndex = reader.ReadInt();
-			HueCycleReverse = reader.ReadBool();
-			HueCycle = reader.ReadArray(reader.ReadShort);
+			var burning = false;
+
+			switch (v)
+			{
+				case 2:
+				{
+					StrobeReverse = reader.ReadBool();
+					StrobeInterval = reader.ReadTimeSpan();
+
+					burning = reader.ReadBool();
+				}
+					break;
+				// Old
+				case 1:
+					burning = reader.ReadBool();
+					goto case 0;
+				case 0:
+				{
+					StrobeInterval = reader.ReadTimeSpan();
+					_StrobeIndex = reader.ReadInt();
+					StrobeReverse = reader.ReadBool();
+
+					reader.ReadArray(r => r.ReadShort());
+				}
+					break;
+			}
+
+			if (burning)
+			{
+				Timer.DelayCall(Ignite);
+			}
 		}
 	}
 }
