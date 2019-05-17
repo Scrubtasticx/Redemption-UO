@@ -957,28 +957,12 @@ namespace Server
 		public int Roll()
 		{
 			int v = m_Bonus;
-//RedemptionUO Start
-			double eco_Modifier = 100;
-			double w;
-//RedemptionUO End	
+
 			for ( int i = 0; i < m_Count; ++i )
 				v += Utility.Random( 1, m_Sides );
 
 			return v;
-//RedemptionUO Start
-			foreach (Item item in World.Items.Values)
-            		{
-				
-            			if (item is StoneGoldCounter)
-            		{
-            		StoneGoldCounter GC = (StoneGoldCounter)item;
-            		eco_Modifier = GC.EconomyMultiplier;
-            		};
-            	
-            	}
-			w = v * (eco_Modifier * .01);
-			return (int)w;
-//RedemptionUO End			
+
 		}
 
 		public LootPackDice( string str )
