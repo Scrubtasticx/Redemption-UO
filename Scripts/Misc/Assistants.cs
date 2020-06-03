@@ -26,7 +26,7 @@ namespace Server.Misc
 			public static void Configure()
 			{
 				//DisallowFeature( Features.FilterWeather );
-				DisallowFeature( Features.AutolootAgent );
+				//DisallowFeature( Features.AutolootAgent );
 			}
 
 			[Flags]

@@ -37,9 +37,9 @@ namespace Server.Misc
 			Account account = (Account)m.Account;
 				if(account.GetTag("AlreadyGotTheirGold") == null)
 			{
-				PackItem( new StatBall() );
-				PackItem( new SkillBall() );
-				PackItem( new BankCheck( 100000 ) );
+			//	PackItem( new StatBall() );
+			//	PackItem( new SkillBall() );
+			//	PackItem( new BankCheck( 100000 ) );
 				account.SetTag("AlreadyGotTheirGold", "True");
 			}
 //RedemptionUO End			

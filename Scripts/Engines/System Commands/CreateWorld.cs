@@ -85,6 +85,8 @@ namespace Server.Gumps
 		{
 			DoThis( from, "UOAMVendors" );
 			DoThis( from, "XmlLoad Spawns.xml" );
+			DoThis( from, "OptimalSmartSpawning" );
+			DoThis( from, "XmlSpawnerRespawnAll" );
 		}
 		
 		public override void OnResponse( NetState sender, RelayInfo info ) 

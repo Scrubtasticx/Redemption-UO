@@ -449,7 +449,7 @@ namespace Server
 
 		public static readonly LootPack OldUltraRich = new LootPack( new LootPackEntry[]
 			{
-				new LootPackEntry(  true, Gold,			100.00, "5d100+600" ),
+				new LootPackEntry(  true, Gold,			100.00, "5d100+1600" ),
 				new LootPackEntry( false, Instruments,	  2.00, 1 ),
 				new LootPackEntry( false, Wands,	  100.00, 1 ), //RedemptionUO Original value remove line
 				new LootPackEntry( false, OldMagicItems,	100.00, 1, 1, 40, 100 ),
