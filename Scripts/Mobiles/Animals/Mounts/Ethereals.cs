@@ -8,6 +8,7 @@ namespace Server.Mobiles
 {
 	public class EtherealMount : Item, IMount, IMountItem, Engines.VeteranRewards.IRewardItem
 	{
+		
 		private int m_MountedID;
 		private int m_RegularID;
 		private Mobile m_Rider;
@@ -713,18 +714,18 @@ namespace Server.Mobiles
 		}
 	}
 
-	public class RideablePolarBear : EtherealMount
+	public class EtherealPolarBear : EtherealMount
 	{
-		public override int LabelNumber { get { return 1076159; } } // Rideable Polar Bear 
-		public override int EtherealHue { get { return 0; } }
+		public override int LabelNumber { get { return 1076159; } } // Ethereal Polar Bear Statuette
+		public override int EtherealHue { get { return 0x4001; } }
 
 		[Constructable]
-		public RideablePolarBear()
+		public EtherealPolarBear()
 			: base( 0x20E1, 0x3EC5 )
 		{
 		}
 
-		public RideablePolarBear( Serial serial )
+		public EtherealPolarBear( Serial serial )
 			: base( serial )
 		{
 		}
@@ -870,4 +871,214 @@ namespace Server.Mobiles
 			}
 		}
 	}
+	
+	public class EtherealBoura : EtherealMount
+    {
+        public override int LabelNumber { get { return 1150006; } } // Rideable Boura Statuette
+
+        [Constructable]
+        public EtherealBoura()
+            : base(0x46F8, 0x3EC6 )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealBoura(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }
+	
+	public class EtherealAncientHellHound : EtherealMount
+    {
+        public override int LabelNumber { get { return 1155723; } } // Rideable Ancient Hell Hound Statuette
+
+        [Constructable]
+        public EtherealAncientHellHound()
+            : base(0x3FFD, 0x3EC9 )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealAncientHellHound(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }
+	
+	public class EtherealTiger : EtherealMount
+    {
+        public override int LabelNumber { get { return 1154589; } } // Rideable Tiger Statuette
+
+        [Constructable]
+        public EtherealTiger()
+            : base(0x9844, 0x3EC7 )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealTiger(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }
+	
+	public class EtherealTarantula : EtherealMount
+    {
+        public override int LabelNumber { get { return 1157081; } } // Tarantula Statuette
+
+        [Constructable]
+        public EtherealTarantula()
+            : base(0x9DD6, 0x3ECA )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealTarantula(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }
+	
+	public class EtherealLasher : EtherealMount
+    {
+        public override int LabelNumber { get { return 1157214; } } // Lasher Statuette
+
+        [Constructable]
+        public EtherealLasher()
+            : base(0x9E35, 0x3ECB )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealLasher(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }
+	
+	public class EtherealSerpentineDragon : EtherealMount
+    {
+        public override int LabelNumber { get { return 1157995; } } // Ethereal Dragon Statuette
+
+        [Constructable]
+        public EtherealSerpentineDragon()
+            : base(0xA010, 0x3ECE )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealSerpentineDragon(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }
+
+public class EtherealWarBoar : EtherealMount
+    {
+        public override int LabelNumber { get { return 1159423; } } // Ethereal War Boar Statuette
+
+        [Constructable]
+        public EtherealWarBoar()
+            : base(0xA554, 0x3ED2 )
+        {
+        }
+
+		public override int EtherealHue { get { return 0x4001; } }
+
+        public EtherealWarBoar(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+            writer.Write(2); // version
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+            int version = reader.ReadInt();
+        }
+    }	
 }

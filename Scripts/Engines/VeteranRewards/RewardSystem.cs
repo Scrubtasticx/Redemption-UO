@@ -446,7 +446,7 @@ namespace Server.Engines.VeteranRewards
 					} ),
 					new RewardList( RewardInterval, 9, new RewardEntry[]
 					{
-						new RewardEntry( etherealSteeds,	1076159, typeof( RideablePolarBear ), Expansion.ML ),
+						new RewardEntry( etherealSteeds,	1076159, typeof( EtherealPolarBear ), Expansion.ML ),
 						new RewardEntry( houseAddOns,		1080549, typeof( WallBannerDeed ), Expansion.ML )
 					} ),
 					new RewardList( RewardInterval, 10, new RewardEntry[]
