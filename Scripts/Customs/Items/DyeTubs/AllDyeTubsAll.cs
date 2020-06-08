@@ -19,9 +19,17 @@ namespace Server.Items
     public class AllDyeTubsAll : DyeTub
     {
         private int i_charges;
-        private int TheHue = Utility.RandomDyedHue();
-        //		private int TheHue = AllHuesInfo.Reds;
-        private int m_DyedHue;
+		
+        private static int[] m_Hues = new int[]
+		{
+			0x483, 0x48C, 0x488, 0x48A,
+		    0x495, 0x48B, 0x486, 0x485,
+			0x48D, 0x490, 0x48E, 0x491,
+			0x48F, 0x494, 0x484, 0x497,
+			0x489, 0x47F, 0x482, 0x47E
+			
+		};
+		private int m_DyedHue;
         private bool m_Redyable = false;
         private bool m_Charged = true;
         private bool m_AllowPack = true;
@@ -52,8 +60,8 @@ namespace Server.Items
         {
             Name = "Dye Tub [*Everything*]";
             Weight = 5.0;
-            Hue = TheHue;
-            DyedHue = TheHue;
+            Hue = Utility.RandomList( m_Hues );
+            DyedHue = Utility.RandomList( m_Hues );
             Charges = Utility.RandomMinMax(1, 3);
         }
 
