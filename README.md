@@ -22,6 +22,11 @@ Typical Linux Build (MONO)
 
 ~/runuo$ mcs -optimize+ -unsafe -t:exe -out:RunUO.exe -win32icon:Server/runuo.ico -nowarn:219,414 -d:NEWTIMERS -d:NEWPARENT -d:MONO -reference:System.Drawing -recurse:Server/*.cs
 
+***
+After install login into game with admin account and type
+
+[createworld
+***
 
 zlib is required for certain functionality. Windows zlib builds are packaged with releases and can also be obtained separately here: https://github.com/msturgill/zlib/releases/latest
 
@@ -30,10 +35,3 @@ RunUO supports Intel's hardware random number generator (Secure Key, Bull Mounta
 Latest Razor builds can be found at https://github.com/msturgill/razor/releases/latest
 
 Latest UOSteam builds (previously AssistUO) can be found at http://uosteam.com
-
-***
-After install login into game with admin account and type
-
-[createworld
-***
-
