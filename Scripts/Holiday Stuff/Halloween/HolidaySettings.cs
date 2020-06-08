@@ -7,8 +7,8 @@ namespace Server.Events.Halloween
 {
 	class HolidaySettings
 	{
-		public static DateTime StartHalloween { get { return new DateTime( 2012, 10, 24 ); } } // YY MM DD
-		public static DateTime FinishHalloween { get { return new DateTime( 2012, 11, 15 ); } }
+		public static DateTime StartHalloween { get { return new DateTime( 2020, 6, 8 ); } } // YY MM DD
+		public static DateTime FinishHalloween { get { return new DateTime( 2020, 6, 9 ); } }
 
 		public static Item RandomGMBeggerItem { get { return ( Item )Activator.CreateInstance( m_GMBeggarTreats[ Utility.Random( m_GMBeggarTreats.Length ) ] ); } }
 		public static Item RandomTreat { get { return (Item)Activator.CreateInstance ( m_Treats[ Utility.Random( m_Treats.Length ) ]) ; } }

@@ -1,5 +1,7 @@
 Just type [createworld in game
 
+Or Manually
+
 [Decorate
 [DecorateMag
 [Doorgen
@@ -17,3 +19,5 @@ Just type [createworld in game
 [SecretLocGen
 [GenerateFactions
 [XmlLoad Spawns.xml
+[OptimalSmartSpawning
+[XmlSpawnerRespawnAll
