@@ -29,7 +29,7 @@ namespace Server.Gumps
            this.Resizable = false;
            this.AddPage(0);
 
-           this.AddBackground(133, 77, 414, 206, 3600);
+           this.AddBackground(133, 77, 414, 206, 9200);
 
            this.AddLabel(279, 97, 1178, @"Password Changer");
            this.AddLabel(160, 130, 1299, @"Current Password:");

@@ -7,7 +7,7 @@ namespace Server.Ethics
 {
 	public abstract class Ethic
 	{
-		public static readonly bool Enabled = false;
+		public static readonly bool Enabled = true;
 
 		public static Ethic Find( Item item )
 		{
