@@ -31,3 +31,9 @@ Latest Razor builds can be found at https://github.com/msturgill/razor/releases/
 
 Latest UOSteam builds (previously AssistUO) can be found at http://uosteam.com
 
+***
+After install login into game with admin account and type
+
+[createworld
+***
+
