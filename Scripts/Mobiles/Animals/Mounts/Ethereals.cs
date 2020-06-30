@@ -1052,8 +1052,6 @@ namespace Server.Mobiles
         }
     }
 
-/* Not In client
-
 public class EtherealWarBoar : EtherealMount
     {
         public override int LabelNumber { get { return 1159423; } } // Ethereal War Boar Statuette
@@ -1083,5 +1081,4 @@ public class EtherealWarBoar : EtherealMount
             int version = reader.ReadInt();
         }
     }	
-*/
 }

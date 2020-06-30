@@ -3927,11 +3927,6 @@ set { m_PokerGame = value; }
 		public override void GetProperties( ObjectPropertyList list )
 		{
 			base.GetProperties( list );
-			
-//Redemption Start			
-			if (AccessLevel > AccessLevel.Player)
-				list.Add(1060847, "{0}\t{1}", "Shard", Enum.GetName(typeof(AccessLevel), AccessLevel));
-//Redemption End
 
 			if ( Map == Faction.Facet )
 			{
